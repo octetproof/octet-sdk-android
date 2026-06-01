@@ -1,0 +1,22 @@
+# Per-developer OctetSDK license key + Android SDK location.
+#
+# 1. Copy this file to `local.properties` in the same directory.
+# 2. Get a license key from https://api.octetproof.com/signup.
+# 3. Paste it into the `octet.licenseKey` line below.
+# 4. Set `sdk.dir` to your Android SDK install path (see below).
+#
+# `local.properties` is gitignored; your edits stay local.
+
+octet.licenseKey=octet_live_PASTE_YOUR_LICENSE_KEY_HERE
+
+# Android SDK location. Required for CLI builds (./gradlew). Android
+# Studio writes this automatically the first time you open the project,
+# so you can leave the line commented out if you only build from the
+# IDE. Alternatively, set the ANDROID_HOME environment variable instead
+# of this line.
+#
+# Typical paths:
+#   macOS:   /Users/<you>/Library/Android/sdk
+#   Linux:   /home/<you>/Android/Sdk
+#   Windows: C:\\Users\\<you>\\AppData\\Local\\Android\\Sdk
+#sdk.dir=/Users/REPLACE_ME/Library/Android/sdk
