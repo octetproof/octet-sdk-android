@@ -4,6 +4,13 @@ Binary distribution of the Octet SDK for Android — Maven manifests plus
 tagged AAR releases hosted on the orphan
 [`mvn-repo`](../../tree/mvn-repo) branch of this repository.
 
+> ⚠️ **`0.0.1-alpha` is deprecated.** The v1 license-key schema cutover
+> shipped in **`0.0.2-alpha`** (2026-06-04). Tokens issued by the current
+> production backend will fail to verify on `0.0.1-alpha` with
+> `LicenseError.VerificationFailed(UnsupportedSchema)` at `Octet.start`.
+> Upgrade to `0.0.2-alpha` or later. See [CHANGELOG.md](CHANGELOG.md)'s
+> `[0.0.2-alpha]` entry for details.
+
 ## Installation
 
 In your project's root `settings.gradle.kts`:
@@ -24,7 +31,7 @@ In your app `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.octetproof:sdk:0.0.1-alpha")
+    implementation("com.octetproof:sdk:0.0.2-alpha")
 }
 ```
 
