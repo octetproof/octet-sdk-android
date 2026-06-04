@@ -1,7 +1,7 @@
 # Per-developer OctetSDK license key + Android SDK location.
 #
 # 1. Copy this file to `local.properties` in the same directory.
-# 2. Get a license key from https://api.octetproof.com/signup.
+# 2. Get a license key from https://sdk.octetproof.com/signup.
 # 3. Paste it into the `octet.licenseKey` line below.
 # 4. Set `sdk.dir` to your Android SDK install path (see below).
 #

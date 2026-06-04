@@ -30,7 +30,7 @@ parent repository's Maven branch; no source dependency.
 - Android Studio Hedgehog (2023.1.1) or newer **OR** JDK 17 + the
   Android SDK command-line tools (for the CLI workflow).
 - A valid OctetSDK license key — free trial from
-  [api.octetproof.com/signup](https://api.octetproof.com/signup).
+  [sdk.octetproof.com/signup](https://sdk.octetproof.com/signup).
 
 ## 1. Configure your license key
 
