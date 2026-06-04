@@ -18,6 +18,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.octetproof.sdk.api.AdvancedConfig
 import com.octetproof.sdk.api.LicenseState
 import com.octetproof.sdk.api.Octet
 import com.octetproof.sdk.api.OctetConfig
@@ -177,7 +178,10 @@ class MainActivity : AppCompatActivity(), LocationListener {
         sdkStatus.text = "SDK starting…"
         lifecycleScope.launch {
             try {
-                val config = OctetConfig(licenseKey = BuildConfig.OCTET_LICENSE_KEY)
+                val config = OctetConfig(
+                    licenseKey = BuildConfig.OCTET_LICENSE_KEY,
+                    advanced = AdvancedConfig(
+                        activationServerUrl = BuildConfig.OCTET_ACTIVATION_SERVER_URL))
                 val started = Octet.start(this@MainActivity, config)
                 sdk = started
                 sdkStatus.text = "SDK started — waiting for first proof…"
