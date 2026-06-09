@@ -5,6 +5,79 @@ All notable changes to the OctetSDK for Android are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.0.3-alpha] — 2026-06-09
+
+> **Proof upload + heartbeat lease refresh, plus Android attestation-
+> chain alignment with iOS.** Opt-in proof upload to an `octet-proofs`
+> backend, hardware-backed activation-bearer cache, and a periodic
+> heartbeat scheduler now ship. **Wire-affecting:** per-stage
+> attestation signatures issued by 0.0.2-alpha-and-earlier Android
+> builds will not verify against 0.0.3-alpha. Re-generate proofs on the
+> new SDK to maintain validity.
+
+### Added — proof upload
+
+- `OctetConfig.proofUploadUrl: String?` — opt-in proof-upload endpoint.
+  Default `null`: upload subsystem disabled entirely (no scheduler, no
+  network calls). When set, the SDK uploads each generated
+  `LocationProof` to your configured `octet-proofs` backend. HTTPS-only,
+  with a LAN-HTTP exception (RFC 1918 + loopback) for local development.
+- Authentication, retry-with-backoff, and queuing across app restarts
+  are handled by the SDK — nothing additional to wire up.
+- `proof.id` is now formatted as a lowercase UUID string to match
+  iOS, easing cross-platform tooling.
+
+### Added — heartbeat scheduler + activation-bearer cache
+
+- The activation bearer issued at `/v1/activate` is now persisted in
+  `EncryptedSharedPreferences` (StrongBox-backed master key where
+  available) so the SDK can refresh license leases and authenticate
+  proof uploads across app restarts without re-activating.
+- A background scheduler performs periodic lease-refresh pings at the
+  cadence the activate response specifies. The device fingerprint stays
+  consistent across restarts.
+
+### Changed — Android attestation chain
+
+- The Android per-stage attestation signatures were aligned with iOS
+  for cross-platform parity. Per-stage signatures issued by
+  0.0.2-alpha-and-earlier Android builds will not verify against
+  0.0.3-alpha — re-generate proofs to maintain validity.
+
+### Fixed
+
+- Resolved a false-positive in the SDK's anti-spoof pipeline that
+  could block proof generation on release-signed Android builds.
+- Restored a set of public-API constructors that had been
+  over-stripped by R8 in 0.0.2-alpha (could surface as a runtime
+  `NoSuchMethodError` on first use).
+
+### Independent verifier
+
+- The independent proof verifier is now its own repository:
+  [`octetproof/octet-verify`](https://github.com/octetproof/octet-verify).
+  It verifies a proof from a file or by fetching from a backend, and
+  prints what was and was not validated. Designed to be auditable end-
+  to-end by anyone integrating against the SDK.
+
+### Documented
+
+- New section in `INTEGRATION.md` on proof-upload data handling — what
+  the SDK transmits when upload is enabled, how long uploaded proofs
+  are retained on the Octet-hosted backend, the option to fetch and
+  persist proofs yourself, and the self-hosted backend configuration.
+
+### Sample app
+
+- Sample updated to demonstrate proof upload against the configured
+  activation backend.
+- **Release-signed sample APK** is now attached to each GitHub Release.
+  The CI-built APK ships without a license key baked in — build from
+  source with your own key for a runnable demo.
+- **R8 `mapping.txt`** for the SDK is uploaded to an internal source-
+  repo GitHub Release on every tag, to apply when de-obfuscating
+  consumer crash reports against this version.
+
 ## [0.0.2-alpha] — 2026-06-04
 
 > **v1 license-key cutover.** Wire-breaking: v0-alpha tokens issued
