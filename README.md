@@ -8,7 +8,7 @@ tagged AAR releases hosted on the orphan
 > shipped in **`0.0.2-alpha`** (2026-06-04). Tokens issued by the current
 > production backend will fail to verify on `0.0.1-alpha` with
 > `LicenseError.VerificationFailed(UnsupportedSchema)` at `Octet.start`.
-> Upgrade to `0.0.2-alpha` or later. See [CHANGELOG.md](CHANGELOG.md)'s
+> Upgrade to `0.0.3-alpha` or later. See [CHANGELOG.md](CHANGELOG.md)'s
 > `[0.0.2-alpha]` entry for details.
 
 ## Installation
@@ -31,7 +31,7 @@ In your app `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.octetproof:sdk:0.0.2-alpha")
+    implementation("com.octetproof:sdk:0.0.3-alpha")
 }
 ```
 
