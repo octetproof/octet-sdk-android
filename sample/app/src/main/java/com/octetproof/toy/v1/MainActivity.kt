@@ -180,6 +180,10 @@ class MainActivity : AppCompatActivity(), LocationListener {
             try {
                 val config = OctetConfig(
                     licenseKey = BuildConfig.OCTET_LICENSE_KEY,
+                    // #122/#123: opt-in proof upload to prod backend.
+                    // Same host as activation since octet-proofs is
+                    // co-hosted with the license server.
+                    proofUploadUrl = BuildConfig.OCTET_ACTIVATION_SERVER_URL,
                     advanced = AdvancedConfig(
                         activationServerUrl = BuildConfig.OCTET_ACTIVATION_SERVER_URL))
                 val started = Octet.start(this@MainActivity, config)

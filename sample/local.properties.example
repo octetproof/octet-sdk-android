@@ -1,22 +1,27 @@
-# Per-developer OctetSDK license key + Android SDK location.
+# Per-developer Octet SDK license key + (optional) activation server
+# URL for the dev toy.
 #
 # 1. Copy this file to `local.properties` in the same directory.
-# 2. Get a license key from https://sdk.octetproof.com/signup.
-# 3. Paste it into the `octet.licenseKey` line below.
-# 4. Set `sdk.dir` to your Android SDK install path (see below).
+# 2. Get a v1 license key:
+#    - Production: https://sdk.octetproof.com/signup
+#    - Local backend (real-device testing): open
+#      http://<your-lan-ip>:8000/signup on a browser and submit; the
+#      token lands in the server console (dev) or your email.
+# 3. Paste the token below.
 #
-# `local.properties` is gitignored; your edits stay local.
-
-octet.licenseKey=octet_live_PASTE_YOUR_LICENSE_KEY_HERE
-
-# Android SDK location. Required for CLI builds (./gradlew). Android
-# Studio writes this automatically the first time you open the project,
-# so you can leave the line commented out if you only build from the
-# IDE. Alternatively, set the ANDROID_HOME environment variable instead
-# of this line.
+# `local.properties` is gitignored. Your edits stay local.
 #
-# Typical paths:
-#   macOS:   /Users/<you>/Library/Android/sdk
-#   Linux:   /home/<you>/Android/Sdk
-#   Windows: C:\\Users\\<you>\\AppData\\Local\\Android\\Sdk
-#sdk.dir=/Users/REPLACE_ME/Library/Android/sdk
+# The toy's build.gradle.kts checks for `local.properties` here first
+# (samples-public/android-sample/local.properties), then falls back to
+# the multi-project root (octet-sdk/android/local.properties).
+
+octet.licenseKey=octet_live_PASTE_YOUR_V1_LICENSE_KEY_HERE
+
+# Activation server URL. Default = production. Override when running
+# against a local backend per REAL_DEVICE_TESTING.md. API 28+ blocks
+# cleartext to non-loopback IPs — either use https or the doc's
+# network-security-config exception.
+#
+# Example for local backend:
+#   octet.activationServerUrl=http://192.168.1.42:8000
+octet.activationServerUrl=https://api.octetproof.com

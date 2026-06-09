@@ -2,7 +2,7 @@
 
 Version:        v04.28.2026
 Effective:      2026-04-28
-Canonical text: https://legal.octetproof.com/sdk-terms/v04.28.2026/
+Canonical text: https://legal.octetproof.com/mobile-sdk-terms/v04.28.2026/
 SHA-256 (body): 6801a9f904003f731914eafbafd657065764ad3c97e6fa6fc59c77258509bfe6
 
 By downloading, installing, or using the Octet SDK ("Software") you
@@ -15,7 +15,7 @@ To recompute and verify:
 
     git clone https://github.com/octetproof/octet-legal-documents
     octet-legal-documents/scripts/hash.sh \
-        octet-legal-documents/content/sdk-terms/v04.28.2026.md
+        octet-legal-documents/content/mobile-sdk-terms/v04.28.2026.md
 
 The full text of v04.28.2026 follows.
 
