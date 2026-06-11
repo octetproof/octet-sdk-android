@@ -1,0 +1,29 @@
+# Per-developer Octet SDK license key + (optional) activation server
+# URL for the dev toy.
+#
+# 1. Copy this file to `local.properties` in the same directory.
+# 2. Get a v1 license key:
+#    - Production: https://sdk.octetproof.com/signup
+#    - Local backend (real-device testing against your own
+#      activation backend): open http://<your-lan-ip>:8000/signup on
+#      a browser and submit; the token lands in the server console
+#      (dev) or your email.
+# 3. Paste the token below.
+#
+# `local.properties` is gitignored. Your edits stay local.
+#
+# The toy's build.gradle.kts checks for `local.properties` here first
+# (samples-public/android-sample/local.properties), then falls back to
+# the multi-project root (octet-sdk/android/local.properties).
+
+octet.licenseKey=octet_live_PASTE_YOUR_V1_LICENSE_KEY_HERE
+
+# Activation server URL. Default = production. Override when running
+# against your own self-hosted activation backend. API 28+ blocks
+# cleartext to non-loopback IPs by default — either use https or add
+# a network-security-config exception in your app's manifest for the
+# LAN host.
+#
+# Example for local backend:
+#   octet.activationServerUrl=http://192.168.1.42:8000
+octet.activationServerUrl=https://api.octetproof.com
