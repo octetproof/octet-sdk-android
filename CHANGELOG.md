@@ -5,6 +5,77 @@ All notable changes to the OctetSDK for Android are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.0.4-alpha] — 2026-06-11
+
+> **Security-hardening pass.** Every change is opt-in or fail-safer-
+> by-default; the public API surface is unchanged. Drop-in upgrade
+> from 0.0.3-alpha.
+
+### Added
+
+- **Opt-in TLS public-key pinning** for connections to
+  `api.octetproof.com`, available via a bundled
+  `network_security_config` resource. Off by default in this
+  release; integrators enable it by referencing the SDK's NSC from
+  their own `AndroidManifest.xml`. Pin set covers the current
+  certificate-authority intermediate and a backup pin; pin expiry is
+  tracked and the rotation procedure is documented internally.
+- **Magnetometer-based liveness signal** is now incorporated into
+  on-Earth proof confidence (alongside existing motion / GPS
+  signals).
+- `DeviceKeySecurityLevel` value exposed on the hardware-attestation
+  surface, reporting the actual storage tier the SDK obtained for
+  the device key on this run (`HARDWARE_STRONGBOX` /
+  `HARDWARE_TEE` / `SOFTWARE`).
+
+### Changed — defaults
+
+- **Logcat mirroring of internal SDK logs is now gated** behind
+  `BuildConfig.DEBUG || OctetConfig.debugMode`. Release builds no
+  longer emit the SDK's internal log lines to logcat by default —
+  integrator-facing errors continue to surface through the normal
+  return / exception channels and through the SDK's structured log
+  sink, if one is configured.
+- **StrongBox is requested** for the device key, with a graceful
+  fall-through to TEE-backed and then software-backed keys on
+  devices where StrongBox is unavailable. The chosen tier is now
+  recorded and reported via `DeviceKeySecurityLevel` rather than
+  inferred at attestation time.
+- **On-device proof verifier fails closed.** The on-device verifier
+  now returns an explicit `VerificationStatus` of
+  `VERIFIED` / `SHAPE_VALID_UNVERIFIED` / `INVALID`, with
+  `isValid` set only when the signature has been cryptographically
+  verified against a trusted key. The authoritative end-to-end
+  verifier remains the standalone `octet-verify` CLI.
+- **Proof-upload URL validation** tightened. The LAN-HTTP exception
+  (RFC 1918 + loopback, when proof-upload is opt-in pointed at a
+  development backend) now uses strict numeric-literal parsing
+  rather than DNS-resolving string-prefix matches.
+
+### Removed
+
+- **Vestigial storage / media permissions** are no longer declared
+  in the SDK's `AndroidManifest.xml` and will no longer be
+  manifest-merged into consumer apps. (`READ_MEDIA_*`,
+  `READ_EXTERNAL_STORAGE`, `MANAGE_EXTERNAL_STORAGE`.) The SDK's
+  file I/O is to the app's internal `filesDir` / `cacheDir` and
+  needs no permission.
+
+### Build & packaging
+
+- **libpf native libraries no longer ship debug symbols** in the
+  release AAR.
+- **The SDK and libpf modules now go through R8 minify** in their
+  release builds; `consumer-rules.pro` propagates the JNI keep-rule
+  so downstream consumers don't need to re-declare it in their own
+  ProGuard configuration.
+
+### Sample app
+
+- Sample renamed from the `com.octetproof.toy.v1` package /
+  application id to `com.octetproof.sample`. Source tree, namespace
+  and `applicationId` updated.
+
 ## [0.0.3-alpha] — 2026-06-09
 
 > **Proof upload + heartbeat lease refresh, plus Android attestation-
@@ -74,9 +145,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Release-signed sample APK** is now attached to each GitHub Release.
   The CI-built APK ships without a license key baked in — build from
   source with your own key for a runnable demo.
-- **R8 `mapping.txt`** for the SDK is uploaded to an internal source-
-  repo GitHub Release on every tag, to apply when de-obfuscating
-  consumer crash reports against this version.
+- **R8 `mapping.txt`** for the SDK is attached as a release asset
+  on every tagged release, for use when de-obfuscating consumer
+  crash reports against this version.
 
 ## [0.0.2-alpha] — 2026-06-04
 
@@ -86,32 +157,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed — license model (wire-breaking)
 
-- New v1 PASETO v4.public claim schema: `iss, iat, nbf, exp, lid, sub,
+- New v1 PASETO v4.public claim schema (`iss, iat, nbf, exp, lid, sub,
   jti, typ, v, prod, pver, plat, tier, model, limits, feat, ehash,
-  meta`. Tolerant-reader per spec R1; fail-closed defaults per R2; 60s
-  skew tolerance on `nbf` / `exp`.
+  meta`). Tolerant-reader on unknown claims; fail-closed defaults;
+  60s skew tolerance on `nbf` / `exp`.
 - New `LicenseError.VerificationFailed(reason)` carrying a
-  `VerificationReason` enum (`BadVendorPrefix`, `UnknownKid`,
-  `BadSignature`, `NotYetValid`, `WrongIssuer`, `WrongTyp`,
-  `UnsupportedSchema`, `ProductNotLicensed`, `PlatformNotLicensed`,
-  `ClockRollback`). The other `LicenseError` subclasses
-  (`MalformedKey`, `Expired`, `ActivationWindowClosed`, `Revoked`,
-  `Network`, `NoActivation`, `ServerRejected`) are unchanged.
+  `VerificationReason` value that names the specific failure mode
+  (vendor prefix, signature, validity window, schema mismatch,
+  product/platform mismatch, clock rollback). The other
+  `LicenseError` subclasses (`MalformedKey`, `Expired`,
+  `ActivationWindowClosed`, `Revoked`, `Network`, `NoActivation`,
+  `ServerRejected`) are unchanged.
 - Activation flow: `/v1/activate` now returns a plain JSON lease (TLS
   is the integrity layer); no more signed PASETO activation tokens.
-  `ActivationClient` exposes `activate` / `heartbeat` / `deactivate`
-  per the v1 spec. 14-day offline grace after a successful activation.
-- New device fingerprint per spec §13:
+  `ActivationClient` exposes `activate` / `heartbeat` / `deactivate`.
+  14-day offline grace after a successful activation.
+- Stable device-fingerprint formula:
   `b64url(sha256(install_uuid || platform_hint))` where
   `platform_hint` is `Settings.Secure.ANDROID_ID`.
-- Clock anti-rollback per spec §11: `AnchoredClock` persists server-
+- Anti-rollback clock: `AnchoredClock` persists server-
   timestamp anchors in `EncryptedSharedPreferences` (StrongBox-backed
   master key), raises `ClockRollback` when the wall clock regresses
   past tolerance.
-- New v1 production signing kid `octet-2026-05-f99d` embedded in the
-  registry. Pre-rotation kid `octet-2026-05-62f1` retained for token
-  continuity (still resolves a public key, but its tokens fail the v1
-  schema gate).
 
 ### Removed
 
@@ -123,8 +190,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Sample app
 
 - `local.properties.example` gains an `octet.activationServerUrl` line
-  (defaults to `https://api.octetproof.com`; override for LAN-backend
-  testing per the source repo's `REAL_DEVICE_TESTING.md`).
+  (defaults to `https://api.octetproof.com`; override to a LAN
+  address when running against a self-hosted activation backend).
 - `sample/app/build.gradle.kts` reads `octet.activationServerUrl` from
   `local.properties` and exposes it as `BuildConfig.OCTET_ACTIVATION_SERVER_URL`.
 
