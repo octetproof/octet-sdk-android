@@ -1,4 +1,4 @@
-package com.octetproof.toy.v1
+package com.octetproof.sample
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -24,7 +24,7 @@ import com.octetproof.sdk.api.Octet
 import com.octetproof.sdk.api.OctetConfig
 import com.octetproof.sdk.api.OctetRegion
 import com.octetproof.sdk.api.OctetSdk
-import com.octetproof.toy.v1.BuildConfig
+import com.octetproof.sample.BuildConfig
 import java.time.Instant
 import kotlinx.coroutines.launch
 import java.text.Collator
