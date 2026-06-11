@@ -13,9 +13,10 @@ plugins {
 // on Octet.start with a clear cause.
 //
 // `activationServerUrl` defaults to production. Override only when
-// running the SDK against a local backend per REAL_DEVICE_TESTING.md
-// (LAN-hosted dev backend). API 28+ blocks cleartext to non-loopback
-// IPs without a network-security-config exception.
+// running the SDK against your own self-hosted activation backend
+// on a LAN host. API 28+ blocks cleartext to non-loopback IPs by
+// default — either use https or add a network-security-config
+// exception in your app's manifest for the LAN host.
 val (octetLicenseKey: String, octetActivationServerUrl: String) = run {
     val props = Properties()
     val file = rootProject.file("local.properties")
@@ -30,11 +31,11 @@ val (octetLicenseKey: String, octetActivationServerUrl: String) = run {
 val octetSdkVersion: String = (project.findProperty("octetSdkVersion") as String?) ?: "0.0.2-alpha"
 
 android {
-    namespace = "com.octetproof.toy.v1"
+    namespace = "com.octetproof.sample"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.octetproof.toy.v1"
+        applicationId = "com.octetproof.sample"
         minSdk = 30
         targetSdk = 34
         versionCode = 1
