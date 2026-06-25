@@ -28,7 +28,7 @@ In your app `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.octetproof:sdk:1.0.0")
+    implementation("com.octetproof:sdk:1.1.0")
 }
 ```
 
@@ -74,8 +74,6 @@ trial key works for evaluation.
 - `compileSdk` 34+
 - Kotlin 2.1+
 - AndroidX
-- `arm64-v8a` ABI (the native particle-filter library ships only for
-  this ABI; other ABIs are not supported in this release)
 
 ## Host-app integration prerequisites
 
@@ -86,9 +84,10 @@ don't need to redeclare them.
 
 You **do** still need to request the runtime permissions before calling
 `Octet.start(...)`. See [INTEGRATION.md](INTEGRATION.md) for the full
-integration guide — runtime permission flow, opt-in TLS certificate
-pinning via `network_security_config`, log routing, and reading the
-per-proof `DeviceKeySecurityLevel`.
+integration guide — runtime permission flow, device attestation (Play
+Integrity), optional usage telemetry, opt-in TLS certificate pinning via
+`network_security_config`, log routing, verdict reason codes, and reading
+the per-proof `DeviceKeySecurityLevel`.
 
 Minimum runtime requests:
 

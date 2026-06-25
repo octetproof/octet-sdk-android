@@ -27,3 +27,14 @@ octet.licenseKey=octet_live_PASTE_YOUR_V1_LICENSE_KEY_HERE
 # Example for local backend:
 #   octet.activationServerUrl=http://192.168.1.42:8000
 octet.activationServerUrl=https://api.octetproof.com
+
+# (Optional) Google Cloud project NUMBER for Play Integrity device
+# attestation. Building from source? Use YOUR OWN Google Cloud project —
+# create one in the Google Cloud console, link it to your Play Console app,
+# and put its project NUMBER (not the project ID) here.
+#
+# Leave this commented out (or absent / empty / non-numeric) to build
+# WITHOUT Play Integrity — the SDK simply skips it and the build still works.
+# Only a real numeric project number enables attestation.
+#
+#   octet.playIntegrityCloudProjectNumber=123456789012

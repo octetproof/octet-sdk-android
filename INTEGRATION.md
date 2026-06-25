@@ -58,6 +58,22 @@ within the retention window and persist it yourself.
 
 ---
 
+## Usage telemetry
+
+The SDK collects **aggregate, privacy-preserving usage counters** — e.g. how many
+proofs were generated, uploaded, or couldn't be produced, by coarse level and
+region type — and reports them to the license backend, indexed by your license.
+This is **on by default**; disable it with
+`OctetConfig(licenseKey = …, telemetryEnabled = false)`.
+
+The counters contain **no location data** — no coordinates, region IDs, or proof
+contents; only aggregate integers and coarse enum labels. They're buffered in an
+encrypted file in the app's private storage and uploaded at most once a day (plus
+a best-effort flush when the app backgrounds); the SDK schedules no background
+work for this. Disabling deletes any buffered file.
+
+---
+
 ## Opt-in TLS certificate pinning
 
 The SDK ships with a public-key pin set for `api.octetproof.com` (the
@@ -95,6 +111,40 @@ can decide what to accept per the trust requirements of the
 integration. The SDK does not refuse to operate when only `SOFTWARE`
 storage is available — it generates honest proofs at the level
 actually achieved, and the acceptance decision lives at the verifier.
+
+---
+
+## Device attestation
+
+Every signed proof carries a hardware-backed **device attestation** via Google
+Play Integrity, so a relying party can confirm the proof came from a genuine app
+instance on a genuine device. No integration code is required; it is part of
+proof generation. How often a fresh attestation is produced is configurable via
+`OctetConfig.advanced.attestationCadence` — `PerSession`, `Periodic(intervalSeconds)`
+(default), or `PerProof` (highest assurance, highest cost).
+
+Verifying a Play Integrity token needs a Google Cloud project. By default the SDK
+uses the project linked to your app in the Play Console. To bind a specific one,
+set `OctetConfig.advanced.playIntegrityCloudProjectNumber` to your Google Cloud
+project **number** (not the project ID).
+
+---
+
+## Interpreting a verdict — reason codes & achievable level
+
+`isWithin` / `isOutside` / `contains` return an `OctetVerdict` whose `result` is a
+trichotomy — `YES` / `NO` / `INDETERMINATE`. `INDETERMINATE` means "can't answer
+right now"; never silently treat it as `NO`. The `reason` says why:
+
+| Reason | Meaning | Typical handling |
+|---|---|---|
+| `INSUFFICIENT_PRECISION` | Conditions can't support a proof at the requested precision. `achievableLevel` names the best level the SDK *could* reach. | Re-request at `achievableLevel`, or apply your own fallback — the SDK never silently down-levels. |
+| `SPOOFING_DETECTED` / `TAMPERING` | A positive security signal — suspected spoofing, or device tampering. | Treat as untrusted; don't retry blindly. |
+| `NO_FIX` / `STALE_FIX` / `NO_PROOF_AT_RESOLUTION` | No fresh fix yet / time outside the proof's validity window / cached proof too coarse for the query. | Retry shortly. |
+
+When `result` is `INDETERMINATE` with reason `INSUFFICIENT_PRECISION`, read
+`verdict.achievableLevel` to decide whether the coarser level is acceptable
+before re-requesting.
 
 ---
 

@@ -185,7 +185,11 @@ class MainActivity : AppCompatActivity(), LocationListener {
                     // co-hosted with the license server.
                     proofUploadUrl = BuildConfig.OCTET_ACTIVATION_SERVER_URL,
                     advanced = AdvancedConfig(
-                        activationServerUrl = BuildConfig.OCTET_ACTIVATION_SERVER_URL))
+                        activationServerUrl = BuildConfig.OCTET_ACTIVATION_SERVER_URL,
+                        // Enables Android Play Integrity when set in local.properties
+                        // (octet.playIntegrityCloudProjectNumber); 0L → disabled.
+                        playIntegrityCloudProjectNumber =
+                            BuildConfig.OCTET_PI_CLOUD_PROJECT.takeIf { it != 0L }))
                 val started = Octet.start(this@MainActivity, config)
                 sdk = started
                 sdkStatus.text = "SDK started — waiting for first proof…"

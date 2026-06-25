@@ -17,7 +17,7 @@ plugins {
 // on a LAN host. API 28+ blocks cleartext to non-loopback IPs by
 // default — either use https or add a network-security-config
 // exception in your app's manifest for the LAN host.
-val (octetLicenseKey: String, octetActivationServerUrl: String) = run {
+val (octetLicenseKey: String, octetActivationServerUrl: String, octetPiCloudProject: String) = run {
     val props = Properties()
     val file = rootProject.file("local.properties")
     if (file.exists()) {
@@ -25,7 +25,11 @@ val (octetLicenseKey: String, octetActivationServerUrl: String) = run {
     }
     val key = props.getProperty("octet.licenseKey", "")
     val url = props.getProperty("octet.activationServerUrl", "https://api.octetproof.com")
-    key to url
+    // (Optional) Google Cloud project NUMBER for Play Integrity. Absent / empty /
+    // non-numeric → "0" → the SDK skips Play Integrity. Use YOUR OWN project.
+    val pi = (props.getProperty("octet.playIntegrityCloudProjectNumber") ?: "")
+        .trim().toLongOrNull()?.toString() ?: "0"
+    Triple(key, url, pi)
 }
 
 val octetSdkVersion: String = (project.findProperty("octetSdkVersion") as String?) ?: "0.0.2-alpha"
@@ -46,6 +50,9 @@ android {
         buildConfigField("String", "OCTET_LICENSE_KEY", "\"$octetLicenseKey\"")
         buildConfigField("String", "OCTET_ACTIVATION_SERVER_URL",
             "\"$octetActivationServerUrl\"")
+        // Play Integrity cloud project number (0L = disabled). Set your own via
+        // octet.playIntegrityCloudProjectNumber in local.properties.
+        buildConfigField("Long", "OCTET_PI_CLOUD_PROJECT", "${octetPiCloudProject}L")
     }
 
     buildFeatures {

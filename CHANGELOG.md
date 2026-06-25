@@ -5,6 +5,51 @@ All notable changes to the OctetSDK for Android are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] — 2026-06-25
+
+> Feature release on top of 1.0.0. Backwards-compatible, drop-in upgrade: the
+> public API additions are additive and the proof wire format stays compatible
+> (existing proofs remain valid).
+
+### Added
+
+- **Device attestation.** Proofs now carry a Google Play Integrity verdict bound
+  into the signed proof chain, so a verifier can confirm a proof came from a
+  genuine app instance on a genuine device. Cadence is configurable via
+  `OctetConfig.advanced.attestationCadence` (per-session / periodic / per-proof).
+  Integrators may bind their own Google Cloud project via
+  `AdvancedConfig.playIntegrityCloudProjectNumber` (defaults to the Play
+  Console-linked project).
+- **Anti-replay protection for uploaded proofs.** Each uploaded proof carries a
+  server-issued, single-use upload nonce and a replay-control binding, so the
+  backend can reject duplicated or replayed uploads. Proofs generated offline
+  still upload and remain valid.
+- **Semantic field binding.** A proof's level, region type, and integrity status
+  are cryptographically bound into the proof chain and can't be altered after the
+  fact without invalidating the proof.
+- **Optional usage telemetry.** Aggregated, privacy-preserving usage counters
+  (no location data) reported to the license backend. On by default; disable with
+  `OctetConfig.telemetryEnabled = false`. Counters are buffered encrypted on
+  device and uploaded at most once a day.
+- **`OctetVerdict.achievableLevel` + clearer reason codes.** When the SDK can't
+  produce a proof at the requested precision, the verdict reports the level it
+  *can* reach, plus reason codes that separate a benign precision shortfall
+  (`INSUFFICIENT_PRECISION`) from a security refusal (`SPOOFING_DETECTED` /
+  `TAMPERING`).
+
+### Changed
+
+- When a location can't be proven at the requested precision, the SDK now returns
+  an `INDETERMINATE` verdict carrying the achievable level instead of silently
+  emitting a coarser proof — your app decides any fallback.
+
+### Fixed
+
+- Proof uploads no longer stall after an activation lease expires during an
+  offline grace period; the SDK re-activates and resumes.
+- Warm-start reliability: a stale activation token is refreshed before the first
+  proof upload after launch.
+
 ## [1.0.0] — 2026-06-11
 
 > **First stable release.** The public API, proof wire format, and license-
