@@ -5,6 +5,97 @@ All notable changes to the OctetSDK for Android are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-07-29
+
+> Feature release on top of 1.1.0. Backwards-compatible, drop-in upgrade: the
+> public API additions are additive and the proof wire format is a strict superset
+> of 1.1.0 — a proof made without a session nonce is byte-identical, and the new
+> optional session-binding stage is ignored (NOT-CHECKED) by a 1.1.0 verifier.
+> **Enforcing** session-binding needs octet-verify ≥ 1.2.0. Two other additions
+> ship **inert** (SDK-version upgrade gating; the `creditServiceUrl` hook) —
+> present but with no runtime effect until their backends turn them on — so
+> upgrading changes nothing for existing integrations.
+
+### Added
+
+- **Verifier hardware-root bootstrap — `Octet.attestationEnrolmentBundle()`.**
+  Returns this device key's `AttestationEnrolmentBundle` (`jsonString()` /
+  `protoData()`). Provided for API symmetry with iOS: on Android, proofs already
+  self-carry their full hardware-root evidence (the Key Attestation certificate
+  chain) on every proof, so a verifier does not need a separate enrolment step —
+  the bundle is a convenience mirror, not a requirement. Cheap and local (a
+  Keystore read); returns `null` until the device key has been attested.
+- **SDK version reporting + upgrade gating.** The SDK now reports its version and
+  platform on every backend request. Two new surfaces:
+  `LicenseError.UpgradeRequired(minVersion, message)`, thrown from `Octet.start`
+  when the backend rejects an out-of-support version; and non-fatal soft-warning
+  hints on `LicenseStatus` — `upgradeRecommended: Boolean` and
+  `minSupportedVersion: String?`. **Inert in 1.2.0** — the backend gates no version
+  yet, so you will not see these until version policy is enabled.
+- **`OctetConfig.creditServiceUrl` (reserved).** Opt-in endpoint for a forthcoming
+  credit-consumption subsystem. Default `null` disables it; **metering is not
+  active in this release.**
+- **Data collection disclosure.** INTEGRATION.md gains a "Data collection
+  disclosure" section (what the SDK handles, by purpose) to help you complete your
+  Play Console Data Safety form. No behaviour change — documentation only.
+- **`OctetConfig.debugMode`.** New opt-in config field (default `false`). When
+  `true`, the SDK mirrors its internal log to `android.util.Log` (`OctetInternal`)
+  even in a **release** build, so you can surface SDK internals for a support
+  deep-dive without a debug build. Off by default — a shipped SDK writes nothing
+  to your logcat. (#163)
+- **Session-binding for logins.** `isWithin` / `isOutside` / `contains` gain an
+  optional `sessionNonce: ByteArray?`. Pass the one-time nonce your login backend
+  issued and it's committed inside the signed proof, so your verifier can confirm
+  the proof was made *for that specific login*; forward the returned `verdict.proof`
+  to your backend. Only a hash of the nonce is serialized (never the raw bytes);
+  omitting it preserves 1.1.0 behaviour exactly. Enforcement needs octet-verify ≥
+  1.2.0. Fixes Android LFA logins, which previously failed server-side without a
+  bound nonce. (#128)
+
+### Changed
+
+- **Public API surface narrowed.** Several internal `com.octetproof.sdk.model` types
+  that were public-by-default on Android (but internal on iOS) are now `internal`,
+  aligning the two platforms' public surface. `Position` and `GeoBounds` remain
+  public. These types were never documented or supported; if you rebuild against
+  1.2.0 and referenced one, you'll see "no such type" — switch to the public `Octet`
+  API. (#108)
+- **Stronger GNSS anti-spoofing.** The raw-GNSS witness that cross-checks the fused
+  location provider is now fully functional and degrades honestly on weak signal,
+  improving spoof resistance for on-Earth proofs. No change to the proof wire
+  format or public API.
+- **Rolling license-token persistence.** The SDK persists the refreshed license
+  token returned on lease responses, so a device holds a fresh token across
+  restarts within the offline-grace window.
+- **Permission footprint trimmed.** The AAR no longer merges
+  `ACCESS_BACKGROUND_LOCATION` or `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` — neither
+  is used by the on-demand foreground proof flow, and both trip Google Play review.
+  If you added a `tools:node="remove"` workaround, you can drop it. See the
+  permission table in INTEGRATION.md.
+
+### Fixed
+
+- **Hardware-attestation level now reported on the wire.** A serialization bug
+  dropped `device_attestation.security_level` from the proof, so a healthy
+  TEE / StrongBox device could be rejected as "not hardware-backed" by a
+  Strong-gating verifier. Fixed — proofs now carry the true attestation tier.
+- **Attestation key re-attested before its chain expires.** The device's
+  key-attestation chain has a short-lived (~14-day) intermediate; the SDK now
+  regenerates the key before the chain ages out, instead of presenting an expired
+  chain that fails verification about two weeks after enrolment.
+
+### Packaging
+
+- **16 KB page-size support.** The bundled native libraries are aligned for the
+  16 KB memory-page devices that Android 15+ introduces, so the SDK loads on that
+  hardware. No action needed by integrators.
+
+### Build & distribution
+
+- Releases now publish **SHA-256 checksums** and **SLSA build provenance**, an
+  **SBOM**, and a **keyless cosign signature** for the AAR. See the "Verifying the
+  download" section in `INTEGRATION.md`.
+
 ## [1.1.0] — 2026-06-25
 
 > Feature release on top of 1.0.0. Backwards-compatible, drop-in upgrade: the
