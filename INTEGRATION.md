@@ -182,7 +182,7 @@ when the backend stops supporting the running SDK version. Handle it by promptin
 the user to update the app; a live session already running is unaffected.
 `LicenseStatus` also exposes non-fatal hints — `upgradeRecommended` and
 `minSupportedVersion` — to nudge an upgrade before the hard cutoff. (Version gating
-is dormant until enabled server-side, so you will not see these in 1.2.0 yet —
+is dormant until enabled server-side, so you will not see these in 1.2.1 yet —
 wiring the handler now keeps you ready.)
 
 ---
@@ -235,10 +235,11 @@ into `android.util.Log`.
 
 Implement `LogSink` and pass it via `OctetConfig.logSink` to route the
 SDK's log lines into your own observability pipeline. Release builds
-gate logcat emission behind `BuildConfig.DEBUG || OctetConfig.debugMode`
+gate logcat emission behind `BuildConfig.DEBUG`
 so coordinates and license fragments do not appear in plain text in
-release-build logcat output; use the SDK's debug-mode toggle if you
-need them visible during development.
+a released build's logcat output; a released SDK does not write to the host
+app's logcat at all — the internal diagnostic stream is emitted only by a
+debug build of the SDK.
 
 ---
 
@@ -287,7 +288,7 @@ gh attestation verify sdk-<version>.aar \
 
 Steps 1–2 (checksum + keyless cosign signature) are the required verification and
 must both report success. Step 3 (`gh attestation verify`) applies only when a
-`.sigstore.json` build-provenance bundle is attached to the release — 1.2.0 ships
+`.sigstore.json` build-provenance bundle is attached to the release — 1.2.1 ships
 **without** one (a private-source-repo limitation, tracked in `octetproof/octet-sdk#169`),
 so skip step 3 if no bundle is present. Steps 2–3 use the attached files offline —
 the GitHub CLI and cosign are needed, but no special repository access.

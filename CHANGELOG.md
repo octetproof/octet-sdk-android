@@ -5,6 +5,44 @@ All notable changes to the OctetSDK for Android are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.1] — unreleased
+
+> **Security hotfix on top of 1.2.0.** No new features and **no change to the proof
+> wire format, proof semantics, trust levels, or verdict codes** — a 1.2.1 proof
+> means exactly what a 1.2.0 proof means, and every verifier is unaffected. This
+> release hardens the shipped release binaries and removes `OctetConfig.debugMode`.
+> **All consumers should upgrade**; 1.0.0 / 1.1.0 / 1.2.0 are deprecated.
+>
+> _Release date stamped at tag time._
+
+### Security
+
+- **Release binaries hardened.** The Android native library is rebuilt with
+  developer build-path remapping, `panic = abort`, and symbol stripping, so shipped
+  binaries no longer embed developer build-machine paths or internal source
+  identifiers.
+- **Release CI guards against binary identifier leakage.** A release-pipeline check
+  fails the build if any shipped binary contains internal identifiers, so a
+  regression cannot silently reintroduce them.
+
+### Fixed
+
+- **Android internal logs no longer include raw coordinates or a device identifier.**
+  Two internal diagnostic log lines embedded a raw latitude/longitude and a device
+  identifier; both are now redacted.
+
+### Removed (breaking)
+
+- **`OctetConfig.debugMode` (added in 1.2.0).** This opt-in field let an integrator
+  mirror the SDK's internal diagnostic logs to the host app's logcat in a **release**
+  build; removing it restores the safe default in which a released SDK writes nothing
+  to consumer logcat. **Breaking** for anyone who set it — the field existed for only
+  one release.
+
+### Deprecated
+
+- **1.0.0, 1.1.0, and 1.2.0 are deprecated in favour of 1.2.1.**
+
 ## [1.2.0] — 2026-07-29
 
 > Feature release on top of 1.1.0. Backwards-compatible, drop-in upgrade: the
