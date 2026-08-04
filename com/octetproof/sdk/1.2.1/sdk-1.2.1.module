@@ -1,0 +1,215 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.octetproof",
+    "module": "sdk",
+    "version": "1.2.1",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.9"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseVariantReleaseApiPublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "com.google.protobuf",
+          "module": "protobuf-javalite",
+          "version": {
+            "requires": "3.25.5"
+          }
+        },
+        {
+          "group": "com.google.protobuf",
+          "module": "protobuf-kotlin-lite",
+          "version": {
+            "requires": "3.25.5"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.1.10"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "sdk-1.2.1.aar",
+          "url": "sdk-1.2.1.aar",
+          "size": 1370668,
+          "sha512": "c4af0bdf7dc3bf15860e040a7cba14d386b96fc4a4b53690f71668d3b7674ce2973373736b51adc0cdefefd4690b9bb738850fdc8c9f0f45f0d6bd828aea7a81",
+          "sha256": "1b2e915fc0560267ed18063d2e0861d6ce4b761f134346ffcd71ffbca38a283b",
+          "sha1": "b1d91b00e480f45d28cd931bd906ed454e70172e",
+          "md5": "e815a2b92bb1830caf3ef22e94bfd10c"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseRuntimePublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "com.octetproof",
+          "module": "libpf",
+          "version": {
+            "requires": "1.2.1"
+          }
+        },
+        {
+          "group": "androidx.core",
+          "module": "core-ktx",
+          "version": {
+            "requires": "1.9.0"
+          }
+        },
+        {
+          "group": "org.apache.commons",
+          "module": "commons-lang3",
+          "version": {
+            "requires": "3.12.0"
+          }
+        },
+        {
+          "group": "org.apache.commons",
+          "module": "commons-math3",
+          "version": {
+            "requires": "3.6.1"
+          }
+        },
+        {
+          "group": "org.ejml",
+          "module": "ejml-ddense",
+          "version": {
+            "requires": "0.43"
+          }
+        },
+        {
+          "group": "mil.nga",
+          "module": "tiff",
+          "version": {
+            "requires": "3.0.0"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-coroutines-core",
+          "version": {
+            "requires": "1.7.3"
+          }
+        },
+        {
+          "group": "com.google.android.gms",
+          "module": "play-services-location",
+          "version": {
+            "requires": "21.2.0"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-serialization-json",
+          "version": {
+            "requires": "1.6.3"
+          }
+        },
+        {
+          "group": "androidx.security",
+          "module": "security-crypto",
+          "version": {
+            "requires": "1.1.0-alpha06"
+          }
+        },
+        {
+          "group": "androidx.work",
+          "module": "work-runtime-ktx",
+          "version": {
+            "requires": "2.9.1"
+          }
+        },
+        {
+          "group": "org.bouncycastle",
+          "module": "bcprov-jdk18on",
+          "version": {
+            "requires": "1.78.1"
+          }
+        },
+        {
+          "group": "com.google.android.play",
+          "module": "integrity",
+          "version": {
+            "requires": "1.6.0"
+          }
+        },
+        {
+          "group": "com.google.protobuf",
+          "module": "protobuf-javalite",
+          "version": {
+            "requires": "3.25.5"
+          }
+        },
+        {
+          "group": "com.google.protobuf",
+          "module": "protobuf-kotlin-lite",
+          "version": {
+            "requires": "3.25.5"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.1.10"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "sdk-1.2.1.aar",
+          "url": "sdk-1.2.1.aar",
+          "size": 1370668,
+          "sha512": "c4af0bdf7dc3bf15860e040a7cba14d386b96fc4a4b53690f71668d3b7674ce2973373736b51adc0cdefefd4690b9bb738850fdc8c9f0f45f0d6bd828aea7a81",
+          "sha256": "1b2e915fc0560267ed18063d2e0861d6ce4b761f134346ffcd71ffbca38a283b",
+          "sha1": "b1d91b00e480f45d28cd931bd906ed454e70172e",
+          "md5": "e815a2b92bb1830caf3ef22e94bfd10c"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseJavaDocPublication",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "javadoc",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "sdk-1.2.1-javadoc.jar",
+          "url": "sdk-1.2.1-javadoc.jar",
+          "size": 1829491,
+          "sha512": "d74ea7dbf73142a60937fb811d3239f0f4f207ec11c4e10c425ad96ccb16e5db70afe103a12eab81f5fd90e9c26e86af5e35eb5c53debfd33b877f61c3ddc54a",
+          "sha256": "703f12e16c9e7fc4c1c69d9d8f869c37c1032b8c1dff0d51ff5d3c535bf8f4f5",
+          "sha1": "df517d320998c171faa1b8f23b5d809bdbae9225",
+          "md5": "f974ee0a871969c8c6dceee994166474"
+        }
+      ]
+    }
+  ]
+}
