@@ -1,76 +1,75 @@
-# app-v1-toy — Android dev sample
+# OctetSample — Android sample
 
-Minimal demo app exercising only the public v1 SDK surface
-(`Octet.start(...)` + `sdk.loc.isWithin(...)`). One button, one
-verdict. Pairs with `samples-public/ios-sample/` on the iOS side.
+A Jetpack Compose demo of the public v1 SDK surface, built around two
+tabs:
 
-This is the **dev-time copy**. It consumes the SDK via the Gradle
-`project(":sdk")` project dependency, so SDK changes propagate
-immediately — no release roundtrip required. Use it to smoke-test new
-SDK features as you write them.
+- **Generate** — pick a region, watch the proof pipeline run (*SDK
+  initialized → sensors warmed up → location fixed → proof generated*,
+  with per-step timings and a map of your position), and get the
+  predicate answer (`sdk.loc.isWithin(...)`). The result card shows the
+  outcome, a confidence bucket, and the battery consumed by the run.
+  Generated proofs are kept in a sample-owned store.
+- **Verify** — run `Octet.verify(...)` on any stored or imported proof
+  and read the grouped on-device checks (signature, freshness,
+  hardware-attestation, …), with a one-line plain-language note on every
+  check that couldn't run and how to make it run. Pick a region to check
+  the proof's claim against, and see the granularity the proof reveals
+  (nothing finer than its level). Proofs can be exported / imported as
+  `.octetproof` files via the Android share/Storage-Access layer —
+  byte-compatible with the iOS build's format.
 
-A **consumer-facing copy** lives at `octet-sdk-android/sample/` in
-the distribution repo. It consumes the published AAR via the maven
-URL (`com.octetproof:sdk:<version>`); the release workflow mirrors
-source changes from here on every tagged release (see
-`.github/workflows/release-android.yml`).
+## Setup (activation)
 
-## Setup (license key)
-
-The SDK won't start without a v1 license key. Get one at
-[api.octetproof.com/signup](https://api.octetproof.com/signup), or
-issue one from your own self-hosted activation backend. Then:
+**The SDK activates by attesting the app instance — there is no license key
+to paste.** On a real device it uses **Google Play Integrity and hardware key
+attestation** and bootstraps its licence automatically on first launch. Copy
+the local config first:
 
 ```bash
-# In samples-public/android-sample/ (preferred):
+# From this directory:
 cp local.properties.example local.properties
-# Open local.properties and paste your key into the octet.licenseKey line.
+# Open local.properties and set octet.activationServerUrl. Optionally set
+# octet.playIntegrityCloudProjectNumber (your own Google Cloud project number)
+# to add a Play Integrity verdict to generated proofs — not required to activate.
 ```
 
-Alternatively, put the line in the Gradle multi-project's root
-`octet-sdk/android/local.properties` — the build checks both
-locations and prefers the sample-local one. Either works; sample-local
-keeps the toy's license key separate from the wider Android SDK
-config (Android Studio writes `sdk.dir` into the root file too).
+`local.properties` is gitignored.
 
-`local.properties` is gitignored in either location. The build wires
-the key into `BuildConfig.OCTET_LICENSE_KEY`; the toy reads that
-constant. Missing key → empty string → runtime
-`LicenseError.MalformedKey` at `Octet.start` (loud, clear) — *not* a
-build failure.
+**Run it on a real device — this sample is prod-only.** On a device with a
+hardware-backed keystore, the SDK attests via **hardware key attestation** and
+bootstraps on first launch. An emulator or CI can't produce production
+attestation; the SDK's sandbox-bootstrap path for those environments is covered
+in the repository's `INTEGRATION.md` but is intentionally not wired into this
+sample. Sign up at [octetproof.com](https://octetproof.com).
 
 ## Build
 
-From the `android/` root:
+This sample is a standalone Gradle project; the SDK
+(`com.octetproof:sdk:<version>`) resolves from the Octet Maven repository
+configured in `settings.gradle.kts`. From this directory:
 
 ```bash
-source environ.sh                            # sets JAVA_HOME and ANDROID_HOME
-./gradlew :app-v1-toy:assembleDebug          # build
-./gradlew :app-v1-toy:installDebug           # build + install on connected device
+./gradlew :app:assembleDebug          # build
+./gradlew :app:installDebug           # build + install on a connected device
 ```
 
-The Gradle module is wired into `android/settings.gradle.kts` with an
-explicit `projectDir` override pointing at this directory:
-
-```kotlin
-include(":app-v1-toy")
-project(":app-v1-toy").projectDir = file("../samples-public/android-sample")
-```
-
-APK output: `samples-public/android-sample/build/outputs/apk/debug/app-v1-toy-debug.apk`
+APK output: `app/build/outputs/apk/debug/app-debug.apk`
 
 Package: `com.octetproof.sample`
 
-## What it does
+> The proof pipeline needs real sensors: GNSS, cellular, Wi-Fi, and
+> motion inputs are only present on a **physical device** — an emulator has
+> no real GNSS / cellular / motion hardware.
 
-1. Requests `ACCESS_FINE_LOCATION`.
-2. Calls `Octet.start(this, OctetConfig(licenseKey =
-   BuildConfig.OCTET_LICENSE_KEY))` (suspending) inside
-   `lifecycleScope.launch { … }`. The SDK verifies the license key,
-   hits `/v1/activate` if needed, caches the activation token, then
-   brings up the proof pipeline.
-3. On tap, runs `sdk.loc.isWithin(OctetRegion.country("US"),
-   Instant.now())` and renders the verdict (`result` / `reason` /
-   `message` / whether a proof attached).
+## Files
 
-Source: `src/main/java/com/octetproof/sample/MainActivity.kt`.
+Compose UI + a single `AndroidViewModel` (`SampleViewModel`) that owns
+the SDK lifecycle, the generate pipeline, verify, region selection, and
+the map location, under `app/src/main/java/com/octetproof/sample/`:
+
+| Area | Files |
+|---|---|
+| App shell / model | `MainActivity.kt`, `RootScreen.kt`, `SampleViewModel.kt`, `AppSettings.kt` |
+| Generate | `GenerateScreen.kt` (pipeline, map, region sheet, result, curated debug feed) |
+| Verify + proofs | `VerifyScreen.kt`, `ProofStore.kt`, `Models.kt`, `Regions.kt` |
+| Shared | `Theme.kt`, `Scaffolds.kt` |

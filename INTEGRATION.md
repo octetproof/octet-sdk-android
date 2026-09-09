@@ -6,6 +6,39 @@ the host app manifest / runtime by platform mandate.
 
 ---
 
+## Activation
+
+As of 2.0.0 the SDK activates by **attesting the device**: at `Octet.start` it
+proves the device with a **hardware key-attestation certificate chain**
+(StrongBox/TEE, rooting to Google's hardware attestation root) and bootstraps its
+licence from the Octet backend. There is no license key to paste; a device that
+cannot attest and carries no sandbox token fails closed.
+
+**What you need**
+
+- A real device with a **hardware-backed keystore** (StrongBox or TEE). An
+  emulator can't produce production attestation.
+- Your app registered with Octet, so the backend recognises it. Sign up at
+  [octetproof.com](https://octetproof.com).
+
+`OctetConfig.licenseKey` is still a field on the config type, but as of 2.0.0 it
+is **no longer the credential that activates the SDK** — it is retained for
+source compatibility and will be removed in a future release. (This is separate
+from Play Integrity, which remains an optional per-proof device attestation — see
+"Device attestation" below.)
+
+### Emulator, CI, and non-attesting builds — sandbox bootstrap
+
+A build that can't produce production key attestation — an emulator, a CI runner,
+or a device without a hardware-backed keystore — activates instead with a
+**sandbox bootstrap token** set on `OctetConfig.sandboxBypassToken`, which you
+self-serve from your account at [octetproof.com](https://octetproof.com). A
+production (Play Store) build cannot use a sandbox token: the SDK refuses it
+before the request is built, and the backend rejects a sandbox token for a
+production app row.
+
+---
+
 ## Runtime permissions
 
 The SDK's `AndroidManifest.xml` contributes exactly these via manifest-merge —
@@ -14,7 +47,7 @@ Console permission declarations + Data Safety form:
 
 | Permission | Why the SDK needs it | Kind | Play notes |
 |---|---|---|---|
-| `INTERNET` | License activation (`api.octetproof.com/v1/activate`) + proof upload | install | — |
+| `INTERNET` | License activation (attested bootstrap) + proof upload | install | — |
 | `ACCESS_FINE_LOCATION` | Core — the location the SDK proves | runtime | request before `Octet.start(...)` |
 | `ACCESS_COARSE_LOCATION` | Country-tier proofs / fallback | runtime | paired with fine |
 | `ACTIVITY_RECOGNITION` | Motion classification (proof confidence) | runtime (API 29+) | disclose in Data Safety |
@@ -64,17 +97,46 @@ within the retention window and persist it yourself.
 
 ## Usage telemetry
 
-The SDK collects **aggregate, privacy-preserving usage counters** — e.g. how many
-proofs were generated, uploaded, or couldn't be produced, by coarse level and
-region type — and reports them to the license backend, indexed by your license.
-This is **on by default**; disable it with
-`OctetConfig(licenseKey = …, telemetryEnabled = false)`.
+The SDK collects **aggregate, privacy-preserving usage telemetry** and reports it
+to the license backend (`POST /v1/metrics`), indexed by the license the SDK was
+activated with. It is **on by default** and disclosed under the Octet Terms &
+Conditions; disable it entirely by setting `telemetryEnabled = false` on your
+`OctetConfig`.
 
-The counters contain **no location data** — no coordinates, region IDs, or proof
-contents; only aggregate integers and coarse enum labels. They're buffered in an
-encrypted file in the app's private storage and uploaded at most once a day (plus
-a best-effort flush when the app backgrounds); the SDK schedules no background
-work for this. Disabling deletes any buffered file.
+**What it never contains.** No coordinates, no positions, no region geometry, no
+proof bytes, no message text — **no precise location data of any kind** — and **no
+new device identifier** (it reuses the opaque fingerprint established at
+activation). It is **encrypted at rest** (AES-256-GCM, with a key held in the
+platform keystore) and sent over TLS.
+
+**Base counters (whenever telemetry is on).** Aggregate counts of proofs
+generated / uploaded / dropped, bucketed by coarse dimensions only — proof
+**level**, region **type** (country / city / …), and failure **stage** — plus the
+SDK version and platform. Buffered in a single rolling file and uploaded at most
+once a day (with a best-effort flush when the app backgrounds); no background
+scheduler.
+
+**Additional diagnostic signals (remotely gated — off unless Octet enables
+them).** When enabled by remote configuration, the SDK adds a set of richer
+**aggregate** signals:
+
+- **Per-proof events** — one flat record per proof, every field a bucketed **enum
+  label** (level, region-resolution trust, which signal anchored the estimate,
+  agreement bucket, geocoder outcome). The one field beyond pure enums is a coarse
+  **region identity** — an **ISO 3166 country / subdivision code** (e.g. `US`,
+  `GB-ENG`), never finer than the level the proof already claims and bounded to
+  ISO 3166 space, not free text. Still no coordinates.
+- **Error diagnostics** — a count of `(error type, call site)` pairs for errors
+  caught at the SDK's public API boundary, with any message mapped to a fixed enum
+  (`license` / `region_decode` / … / `unknown`) — never the raw message, never
+  PII; capped at 50 distinct pairs.
+- **Permissionless-estimate signals** — bucketed signals from the opt-in
+  permissionless location-estimate pathway; the OS permission status is **read,
+  never requested**, and no coordinates are collected.
+
+**Your control.** All of the above — base and gated — stops entirely when
+`telemetryEnabled = false`: no counters are recorded, the persisted file is
+deleted, and `/v1/metrics` is never called.
 
 ---
 
@@ -182,7 +244,7 @@ when the backend stops supporting the running SDK version. Handle it by promptin
 the user to update the app; a live session already running is unaffected.
 `LicenseStatus` also exposes non-fatal hints — `upgradeRecommended` and
 `minSupportedVersion` — to nudge an upgrade before the hard cutoff. (Version gating
-is dormant until enabled server-side, so you will not see these in 1.2.1 yet —
+is dormant until enabled server-side, so you will not see these in 2.0.0 yet —
 wiring the handler now keeps you ready.)
 
 ---
@@ -288,7 +350,7 @@ gh attestation verify sdk-<version>.aar \
 
 Steps 1–2 (checksum + keyless cosign signature) are the required verification and
 must both report success. Step 3 (`gh attestation verify`) applies only when a
-`.sigstore.json` build-provenance bundle is attached to the release — 1.2.1 ships
+`.sigstore.json` build-provenance bundle is attached to the release — 2.0.0 ships
 **without** one (a private-source-repo limitation, tracked in `octetproof/octet-sdk#169`),
 so skip step 3 if no bundle is present. Steps 2–3 use the attached files offline —
 the GitHub CLI and cosign are needed, but no special repository access.
