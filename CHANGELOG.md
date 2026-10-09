@@ -5,6 +5,133 @@ All notable changes to the OctetSDK for Android are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.0.0] — 2026-10-09
+
+> Major release, in lockstep with iOS 3.0.0. Read _Changed (breaking)_ before upgrading.
+> The SDK now sends one usage record per device per day. Location claims follow real
+> borders, so US territories claim their own country and a device close to a border can
+> get `REGION_UNRESOLVED`. A pinned `claimedRegion` must be an assigned ISO 3166 code. An
+> attached debugger now refuses proofs outside a sandbox session. `BootstrapReason`
+> gains a value. The main addition is `TransportPolicy`, which routes every SDK network
+> call through a gateway you choose.
+
+### Changed (breaking)
+
+- **Usage reporting is always on: one record per device per day.** After the first
+  proof of each UTC day the SDK sends one `device_active` usage record with the next
+  background heartbeat, so Octet can count active devices for billing. It carries no
+  location, no proof data, no user or account identity and no new device identifier,
+  and it never blocks or delays a proof. `OctetConfig.creditServiceUrl`, previously a
+  reserved opt-in hook, now defaults to `https://credits.octetproof.com` and only
+  overrides the endpoint for testing. Leaving it unset no longer disables anything.
+  New: `OctetConfig.DEFAULT_CREDIT_SERVICE_URL` and the optional `CreditStatus.reason`.
+  See "Usage reporting" in INTEGRATION.md.
+- **US territories claim their own country.** A device in Puerto Rico, Guam, the US
+  Virgin Islands, American Samoa, the Northern Mariana Islands or the US Minor Outlying
+  Islands now claims that territory's ISO 3166 code (`PR`, `GU`, `VI`, `AS`, `MP`, `UM`).
+  `isWithin(OctetRegion.country("US"), ...)` answers `NO` there. To accept those users,
+  add the territory codes to your region list.
+- **Country and state claims follow real borders.** The SDK claims a country or a state
+  only when the device is clearly inside it. Close to a border, or when the location fix
+  is too coarse to tell, a country or state query returns `INDETERMINATE` with
+  `REGION_UNRESOLVED` where 2.0.0 answered `YES` or `NO`. State claims now also work
+  outside the US, starting with Ukraine and Russia. Crimea, Sevastopol, Donetsk, Luhansk,
+  Zaporizhzhia and Kherson always claim `UA`.
+- **A pinned `claimedRegion` must be an assigned ISO 3166 code.** A code that is
+  malformed or not assigned produces no proof (`REGION_UNRESOLVED`). 2.0.0 signed it.
+- **An attached debugger or native tracer refuses a proof (`TAMPERING`), as on iOS.** A
+  sandbox session (`sandboxBypassToken` set) still allows one, so debugging against the
+  sandbox keeps working.
+- **`BootstrapReason` gains `NewDevicesBlocked`.** A `when (reason)` over
+  `BootstrapReason` without an `else` branch no longer compiles. Add the new case or an
+  `else` branch.
+- **Kotlin binary compatibility.** `AdvancedConfig` and `LicenseStatus` gained
+  constructor parameters with defaults. Source that uses named arguments compiles
+  unchanged. Code compiled against 2.0.0 that calls their constructors or `copy` must be
+  recompiled.
+
+### Added
+
+- **`TransportPolicy` (`OctetConfig.advanced.transport`): choose where the SDK's network
+  calls go.** `TransportPolicy.direct` (the default) is unchanged.
+  `Mode.INTEGRATOR_GATEWAY` sends every first-party call, and the SDK's third-party
+  lookups, through one HTTPS host you run. `Mode.OCTET_GATEWAY` sends them through
+  `gw.octetproof.com`. Options:
+  - `thirdParty`: `ThirdParty.PROXY` (default) sends third-party lookups through the
+    gateway. `ThirdParty.DISABLE` skips them in any mode, and a proof is still produced.
+  - `pins`: SPKI pins for the app-to-gateway TLS connection. Pin a stable intermediate
+    or root, not an auto-rotating leaf. `pins` is ignored in `OCTET_GATEWAY`.
+  - `fallbackToDirect` (default `false`) and `fallbackAfterFailures` (default `3`): after
+    that many gateway failures in a row, critical calls go direct until the gateway
+    recovers.
+  - `osAttestationInGatewayModes` (default `true`): `false` skips per-proof Play
+    Integrity and key attestation in gateway modes, so proofs are marked un-attested.
+  - `borderDataUpdates` (default `true`): see the border-data entry below.
+
+  In a gateway mode, country and state lookups go to `{gateway}/ext/geo/reverse` instead
+  of the OS geocoder. Your gateway must forward that route, or country proofs return
+  `INDETERMINATE` unless `fallbackToDirect` is on. The full route table and reference
+  nginx, Cloudflare and AWS configs are in INTEGRATION.md.
+- **Signed border-data updates.** At most once a day the SDK checks for a newer border
+  map, verifies its signature, and uses it if it is newer than the bundled one. Turn it
+  off with `borderDataUpdates = false`. The bundled border map adds about 2.6 MB to the
+  SDK.
+- **`Octet.verify` reports and enforces the signed verdict tier.** A disc answer verifies
+  whether it was signed `VERIFIED` or `PLAUSIBLE`. New: a `verdict-tier` check on disc
+  answers, `VerifyOptions.requireVerdict` (fails a proof below the tier, and fails closed
+  when the verdict is not signed into the proof), and `ProofVerification.spoofingVerdict`.
+  Matches octet-verify 1.6.0's `--require-verdict`.
+- **`BootstrapReason.NewDevicesBlocked`: a typed startup failure when a free account
+  accepts no new devices.** It carries a server-signed upgrade link (`upgradeUrl`). Open
+  it verbatim and never build one. Devices that already activated are unaffected.
+- **Opt-in `PLAUSIBLE` containment (`OctetConfig.advanced.acceptPlausibleContainment`,
+  default off).** With the flag on, `contains(...)` and `isWithin(OctetRegion.disc(...))`
+  can return `YES` or `NO` from a `PLAUSIBLE` proof, not only from a `VERIFIED` one. With
+  the flag off, a disc query stays `INDETERMINATE` unless the proof is `VERIFIED`.
+- **`LocationProof.spoofingVerdict`**: the proof's assurance tier (`VERIFIED`,
+  `PLAUSIBLE`, ...), readable directly and in `proof` JSON as `spoofing_verdict`, without
+  decoding the proof bytes. Read it, not the region granularity, to decide what a `YES`
+  is worth. See INTEGRATION.md.
+- If you verify proofs yourself with `octet-verify`, run 1.5.0 or later.
+
+### Changed
+
+- **A fresh proof right after `Octet.start` waits for the SDK to finish starting** (up to
+  30 s) instead of returning `NO_FIX`. Allow for this if your app applies its own timeout
+  to the first call.
+- **On a fresh install, `Octet.start` can take a few seconds longer** while it retries the
+  first remote-configuration fetch.
+- `achievableLevel` reports `SUBDIVISION`, never `CITY`, when the fix is too coarse for
+  the requested level.
+- A cached activation is reused only with the same licence and server. Starting offline
+  with an activation from a different licence or server fails with `LicenseError.NoActivation`.
+- `BootstrapFailed(AppNotRegistered)` now says to register the Play App Signing
+  certificate, not the upload certificate.
+- **Dependencies.** `protobuf-javalite` and `protobuf-kotlin-lite` 3.25.9 (exposed as
+  `api`), `ejml-ddense` 0.46.1, `kotlin-stdlib` 2.1.21, and `androidx.security:security-crypto`
+  1.1.0 stable. The SDK is built with compileSdk 36. `minSdk` stays 30.
+
+### Security
+
+- **Updated the built-in TLS pins** for `api.octetproof.com` and `gw.octetproof.com`. If
+  you enabled pinning with 2.0.0, upgrade to 3.0.0.
+- Release builds of the SDK no longer write to logcat.
+
+### Fixed
+
+- US state-level proofs resolve correctly, including state queries made from outside
+  the US.
+- Background state-level proofs carry the device's country.
+- Fewer proofs are refused indoors and for people on the move, on foot or by train, car,
+  bus or bicycle.
+- If `Octet.start` runs before the app has a location permission, proofs work as soon
+  as the permission is granted, without restarting the app.
+- GNSS satellite-data downloads succeed again.
+- Proofs no longer fail verification after the device key is re-created. Affected
+  devices create a new proof key once after the update.
+- A sandbox session signs in again by itself when its sign-in expires. A blank
+  `sandboxBypassToken` is treated as unset.
+
 ## [2.0.0] — 2026-09-09
 
 > Major release, in lockstep with iOS 2.0.0. Two things make it major. First,
@@ -13,8 +140,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > Google's hardware attestation root), and obtains its licence by attested bootstrap,
 > replacing the pasted-license-key activation step. Second, the proof surface grows — a public
 > on-device **verifier** (`Octet.verify`), a public teardown (`OctetSdk.close()`), a
-> cache-bypass (`forceFresh`), an experimental permissionless location estimate —
-> and **semantic-binding v2 becomes the default proof form**. **Read _Changed
+> cache-bypass (`forceFresh`) — and **semantic-binding v2 becomes the default proof form**. **Read _Changed
 > (breaking)_ before upgrading:** the activation change is integration-level, and
 > two verdicts now refuse where they previously returned a misleading positive.
 >
@@ -61,14 +187,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   for this call — for a caller that needs a just-now measurement rather than a
   buffered one. Omitted (the default), behaviour is unchanged: the cache is
   consulted.
-
-- **Permissionless location estimate (experimental, opt-in).** With
-  `advanced.enableLocationEstimator`, a predicate made while the app holds no
-  location permission returns a signed, coarse `OctetVerdict.estimate` instead of
-  failing outright. `OctetVerdict.proof` is always `null` on that path, and a verdict
-  never carries both — so an estimate can never be read as a proof. **This is not a
-  proof pathway:** the radii are conservative bounds, not measured error, and
-  consent for deriving location remains yours.
 
 - **`regionFromJson`.** The inverse of `OctetRegion.toJson()` / `toJsonl()`:
   decodes the same stable tagged shape the forward direction emits, round-tripping

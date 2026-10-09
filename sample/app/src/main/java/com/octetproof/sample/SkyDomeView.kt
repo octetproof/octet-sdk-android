@@ -2,6 +2,7 @@ package com.octetproof.sample
 
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.FlowRow
@@ -25,6 +26,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.cos
@@ -41,7 +43,26 @@ private val constellationColors = mapOf(
     "IRNSS" to Color(0xFFE85AC0),
 )
 
-private fun colorFor(constellation: String) = constellationColors[constellation] ?: Color(0xFF9AA0A6)
+/** Constellation colour — shared with the GNSS lab table + satellite detail. */
+fun colorFor(constellation: String) = constellationColors[constellation] ?: Color(0xFF9AA0A6)
+
+/**
+ * Project a satellite's (azimuth, elevation) onto the tilted sky dome for a canvas
+ * of size [w]×[h]. Shared by the Canvas draw and the tap hit-test so they agree.
+ */
+internal fun skyProject(azDeg: Float, elDeg: Float, w: Float, h: Float): Offset {
+    val cx = w / 2f
+    val cy = h * 0.60f
+    val rx = (w * 0.42f).coerceAtMost(h * 0.72f)
+    val ry = rx * 0.42f
+    val domeH = rx * 0.58f
+    val a = Math.toRadians(azDeg.toDouble())
+    val elR = Math.toRadians(elDeg.coerceIn(0f, 90f).toDouble())
+    val g = cos(elR).toFloat() // 1 at horizon, 0 at zenith
+    val x = cx + rx * g * sin(a).toFloat()
+    val y = cy - ry * g * cos(a).toFloat() - domeH * sin(elR).toFloat()
+    return Offset(x, y)
+}
 
 /**
  * A 2.5D perspective "sky dome": each satellite is placed by azimuth (compass
@@ -52,10 +73,28 @@ private fun colorFor(constellation: String) = constellationColors[constellation]
  * the current fix. Real GnssStatus data — Android only.
  */
 @Composable
-fun SkyDome(satellites: List<SatInfo>, modifier: Modifier = Modifier) {
+fun SkyDome(
+    satellites: List<SatInfo>,
+    modifier: Modifier = Modifier,
+    onSelect: ((SatInfo) -> Unit)? = null,
+) {
     val grid = Color(0xFF5A6068)
-    val labelColor = Color(0xFF9AA0A6)
-    Canvas(modifier) {
+    // Tap-to-select: map the tap to the nearest satellite (within ~48px) using the
+    // same projection the Canvas draws with, so the dome and the table select the
+    // same detail. PointerInputScope.size gives the current dimensions.
+    val tapMod = if (onSelect != null) Modifier.pointerInput(satellites) {
+        detectTapGestures { pos ->
+            val w = size.width.toFloat()
+            val h = size.height.toFloat()
+            val hit = satellites.minByOrNull { s ->
+                (skyProject(s.azimuthDeg, s.elevationDeg, w, h) - pos).getDistanceSquared()
+            } ?: return@detectTapGestures
+            if ((skyProject(hit.azimuthDeg, hit.elevationDeg, w, h) - pos).getDistance() <= 48f) {
+                onSelect(hit)
+            }
+        }
+    } else Modifier
+    Canvas(modifier.then(tapMod)) {
         val w = size.width
         val h = size.height
         val cx = w / 2f
@@ -64,15 +103,7 @@ fun SkyDome(satellites: List<SatInfo>, modifier: Modifier = Modifier) {
         val ry = rx * 0.42f
         val domeH = rx * 0.58f
 
-        fun project(azDeg: Float, elDeg: Float): Offset {
-            val a = Math.toRadians(azDeg.toDouble())
-            val el = elDeg.coerceIn(0f, 90f)
-            val elR = Math.toRadians(el.toDouble())
-            val g = cos(elR).toFloat() // 1 at horizon, 0 at zenith
-            val x = cx + rx * g * sin(a).toFloat()
-            val y = cy - ry * g * cos(a).toFloat() - domeH * sin(elR).toFloat()
-            return Offset(x, y)
-        }
+        fun project(azDeg: Float, elDeg: Float): Offset = skyProject(azDeg, elDeg, w, h)
 
         // Elevation rings: horizon (0°) + 30° + 60°.
         for (el in intArrayOf(0, 30, 60)) {

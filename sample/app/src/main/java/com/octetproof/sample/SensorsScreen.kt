@@ -51,6 +51,22 @@ fun SensorsScreen(nav: NavController) {
     LazyColumn(Modifier.fillMaxSize().padding(pad).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             SampleCard {
+                CardTitle("GNSS & Radio Lab")
+                LabRow("GNSS · Sky", "Live sky map + satellite table & detail") { nav.navigate("gnssSky") }
+                LabRow("GNSS · Orbits (3D)", "How a satellite fix is made — step by step") {
+                    ctx.startActivity(android.content.Intent(ctx, OrbitTheaterActivity::class.java))
+                }
+                LabRow("Cell · Triangulation", "Tower triangulation on a live map (observed cells)") {
+                    ctx.startActivity(android.content.Intent(ctx, CellTheaterActivity::class.java))
+                }
+                LabRow("octet-location", "The full fix — satellites + cell towers, combined") {
+                    ctx.startActivity(android.content.Intent(ctx, LocationTheaterActivity::class.java))
+                }
+            }
+        }
+
+        item {
+            SampleCard {
                 CardTitle("Location & GNSS")
                 Kv("Source", m.locationSource, "Source")
                 Kv("Authorization", m.authStatus, "Authorization")
@@ -138,6 +154,21 @@ fun SensorsScreen(nav: NavController) {
 @Composable
 private fun CardTitle(t: String) =
     Text(t.uppercase(), style = MaterialTheme.typography.labelMedium, color = Theme.accent)
+
+/** A navigation row for the GNSS & Radio Lab card: title + subtitle + chevron. */
+@Composable
+private fun LabRow(title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        }
+        Icon(Icons.Filled.ChevronRight, null, tint = Theme.accent)
+    }
+}
 
 @Composable
 private fun Kv(key: String, value: String, info: String? = null) {

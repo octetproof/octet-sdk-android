@@ -26,19 +26,55 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 /** One satellite as reported by GnssStatus — position on the sky (azimuth +
- *  elevation), signal, constellation, and whether it contributed to the fix. */
+ *  elevation), signal, constellation, identity, band, ephemeris/almanac state,
+ *  and whether it contributed to the fix. Real GnssStatus data — Android only. */
 data class SatInfo(
     val constellation: String,
+    val svid: Int,
     val azimuthDeg: Float,
     val elevationDeg: Float,
     val cn0: Float,
     val usedInFix: Boolean,
-)
+    val band: String,
+    val hasEphemeris: Boolean,
+    val hasAlmanac: Boolean,
+) {
+    /** A stable per-satellite label, e.g. "G14" (GPS 14), "E07" (Galileo), "R22"
+     *  (GLONASS) — the standard single-letter constellation prefix + SVID. */
+    val label: String get() {
+        val prefix = when (constellation) {
+            "GPS" -> "G"; "GLONASS" -> "R"; "Galileo" -> "E"; "BeiDou" -> "C"
+            "QZSS" -> "J"; "SBAS" -> "S"; "IRNSS" -> "I"; else -> "?"
+        }
+        return "%s%02d".format(prefix, svid)
+    }
+}
 
 /** One serving/neighbour cell — radio kind + signal strength. Android exposes
  *  identity + signal but NOT the tower's geographic position, so this is a
  *  relative-signal readout, never a map pin. */
 data class CellSignal(val tech: String, val dbm: Int)
+
+/** One serving/neighbour cell with identity + signal, for the triangulation
+ *  cinematic. Android gives us the cell *identity* and *signal* but never the
+ *  tower's real coordinates — the cinematic estimates a layout from signal
+ *  strength and labels it as such (observed, not integrity-proven). */
+data class CellTower(
+    val tech: String,
+    val dbm: Int,
+    val mcc: Int?,
+    val mnc: Int?,
+    /** TAC (LTE/NR) or LAC (GSM/WCDMA). */
+    val area: Int?,
+    /** CI (LTE) / NCI (NR) / CID (GSM/WCDMA). */
+    val cid: Long?,
+    /** PCI (LTE/NR) or PSC (WCDMA). */
+    val pci: Int?,
+    /** EARFCN / NR-ARFCN / ARFCN / UARFCN. */
+    val channel: Int?,
+    /** true = the serving cell; false = a neighbour. */
+    val registered: Boolean,
+)
 
 /** Live battery snapshot from BatteryManager (no permission needed). */
 data class BatterySnapshot(
@@ -78,6 +114,14 @@ class SensorMonitor(private val ctx: Context) : SensorEventListener {
     var courseDeg by mutableStateOf<Float?>(null); private set
     var locationSource by mutableStateOf("—"); private set
 
+    // Second fix — the OS **fused** provider (or NETWORK as a fallback below API
+    // 31), shown alongside the GPS fix so the two accuracy circles can be compared
+    // on the fix map. The GPS fix above is satellite-only; the fused fix blends
+    // GNSS + network + sensors.
+    var fusedCoordinate by mutableStateOf<Pair<Double, Double>?>(null); private set
+    var fusedAccuracyM by mutableStateOf<Float?>(null); private set
+    var fusedSource by mutableStateOf("—"); private set
+
     // GNSS.
     var satellitesTotal by mutableStateOf<Int?>(null); private set
     var satellitesUsedInFix by mutableStateOf(0); private set
@@ -91,6 +135,8 @@ class SensorMonitor(private val ctx: Context) : SensorEventListener {
     var strongestDbm by mutableStateOf<Int?>(null); private set
     /** Per-cell signal list for the signal-strength view (no positions). */
     var cells by mutableStateOf<List<CellSignal>>(emptyList()); private set
+    /** Per-cell identity + signal, for the triangulation cinematic. */
+    var cellTowers by mutableStateOf<List<CellTower>>(emptyList()); private set
 
     // Wi-Fi.
     var wifiCount by mutableStateOf<Int?>(null); private set
@@ -130,10 +176,14 @@ class SensorMonitor(private val ctx: Context) : SensorEventListener {
                     list.add(
                         SatInfo(
                             constellation = name,
+                            svid = status.getSvid(i),
                             azimuthDeg = az,
                             elevationDeg = el,
                             cn0 = status.getCn0DbHz(i),
                             usedInFix = inFix,
+                            band = bandFor(status, i),
+                            hasEphemeris = status.hasEphemerisData(i),
+                            hasAlmanac = status.hasAlmanacData(i),
                         ),
                     )
                 }
@@ -145,6 +195,7 @@ class SensorMonitor(private val ctx: Context) : SensorEventListener {
     }
 
     private val locationListener = LocationListener { loc -> onLocation(loc) }
+    private val fusedListener = LocationListener { loc -> onFused(loc) }
 
     @SuppressLint("MissingPermission")
     fun start() {
@@ -158,6 +209,15 @@ class SensorMonitor(private val ctx: Context) : SensorEventListener {
             lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let(::onLocation)
             lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, locationListener, Looper.getMainLooper())
         }
+        runCatching {
+            // Prefer the OS fused provider (API 31+); fall back to NETWORK below that.
+            val fused = if (Build.VERSION.SDK_INT >= 31 &&
+                lm.allProviders.contains(LocationManager.FUSED_PROVIDER)
+            ) LocationManager.FUSED_PROVIDER else LocationManager.NETWORK_PROVIDER
+            fusedSource = if (fused == LocationManager.FUSED_PROVIDER) "Fused (OS)" else "Network"
+            lm.getLastKnownLocation(fused)?.let(::onFused)
+            lm.requestLocationUpdates(fused, 1000L, 0f, fusedListener, Looper.getMainLooper())
+        }
         refreshCellular()
         refreshWifi()
         refreshBattery()
@@ -167,6 +227,7 @@ class SensorMonitor(private val ctx: Context) : SensorEventListener {
         sm.unregisterListener(this)
         runCatching { lm.unregisterGnssStatusCallback(gnssCallback) }
         runCatching { lm.removeUpdates(locationListener) }
+        runCatching { lm.removeUpdates(fusedListener) }
     }
 
     override fun onSensorChanged(e: SensorEvent) {
@@ -203,25 +264,53 @@ class SensorMonitor(private val ctx: Context) : SensorEventListener {
         }
     }
 
+    private fun onFused(loc: Location) {
+        fusedCoordinate = loc.latitude to loc.longitude
+        fusedAccuracyM = if (loc.hasAccuracy()) loc.accuracy else null
+    }
+
     @SuppressLint("MissingPermission")
     fun refreshCellular() {
         val t = tm ?: return
         radioTech = runCatching { radioName(t.dataNetworkType) }.getOrDefault("—")
         val infos = runCatching { t.allCellInfo }.getOrNull() ?: return
-        val list = infos.mapNotNull { info ->
+        val towers = infos.mapNotNull { info ->
             when (info) {
-                is CellInfoLte -> CellSignal("LTE", info.cellSignalStrength.dbm)
-                is CellInfoGsm -> CellSignal("2G", info.cellSignalStrength.dbm)
-                is CellInfoWcdma -> CellSignal("3G", info.cellSignalStrength.dbm)
-                is CellInfoNr -> (info.cellSignalStrength as? CellSignalStrengthNr)?.dbm?.let { CellSignal("5G", it) }
+                is CellInfoLte -> info.cellIdentity.let { id ->
+                    CellTower("LTE", info.cellSignalStrength.dbm, id.mccString?.toIntOrNull(),
+                        id.mncString?.toIntOrNull(), id.tac.orNull(), id.ci.orNull()?.toLong(),
+                        id.pci.orNull(), id.earfcn.orNull(), info.isRegistered)
+                }
+                is CellInfoNr -> {
+                    val id = info.cellIdentity as? android.telephony.CellIdentityNr
+                    (info.cellSignalStrength as? CellSignalStrengthNr)?.dbm?.let { dbm ->
+                        CellTower("5G", dbm, id?.mccString?.toIntOrNull(), id?.mncString?.toIntOrNull(),
+                            id?.tac?.orNull(), id?.nci?.orNullL(), id?.pci?.orNull(), id?.nrarfcn?.orNull(),
+                            info.isRegistered)
+                    }
+                }
+                is CellInfoWcdma -> info.cellIdentity.let { id ->
+                    CellTower("3G", info.cellSignalStrength.dbm, id.mccString?.toIntOrNull(),
+                        id.mncString?.toIntOrNull(), id.lac.orNull(), id.cid.orNull()?.toLong(),
+                        id.psc.orNull(), id.uarfcn.orNull(), info.isRegistered)
+                }
+                is CellInfoGsm -> info.cellIdentity.let { id ->
+                    CellTower("2G", info.cellSignalStrength.dbm, id.mccString?.toIntOrNull(),
+                        id.mncString?.toIntOrNull(), id.lac.orNull(), id.cid.orNull()?.toLong(),
+                        null, id.arfcn.orNull(), info.isRegistered)
+                }
                 else -> null
             }
         }.filter { it.dbm != Int.MAX_VALUE && it.dbm != Int.MIN_VALUE }
             .sortedByDescending { it.dbm }
-        cells = list
-        cellCount = list.size
-        strongestDbm = list.firstOrNull()?.dbm
+        cellTowers = towers
+        cells = towers.map { CellSignal(it.tech, it.dbm) }
+        cellCount = towers.size
+        strongestDbm = towers.firstOrNull()?.dbm
     }
+
+    private fun Int.orNull(): Int? = if (this == Int.MAX_VALUE || this == Int.MIN_VALUE) null else this
+    private fun Long.orNullL(): Long? = if (this == Long.MAX_VALUE || this == Long.MIN_VALUE) null else this
 
     @SuppressLint("MissingPermission")
     fun refreshWifi() {
@@ -256,6 +345,21 @@ class SensorMonitor(private val ctx: Context) : SensorEventListener {
             fine -> "Precise (fine)"
             coarse -> "Approximate (coarse)"
             else -> "Denied"
+        }
+    }
+
+    /** Map a satellite's carrier frequency to a human band label (L1/L5/…). */
+    private fun bandFor(status: GnssStatus, i: Int): String {
+        if (!status.hasCarrierFrequencyHz(i)) return "—"
+        val mhz = status.getCarrierFrequencyHz(i) / 1e6
+        return when {
+            mhz in 1565.0..1585.0 -> "L1/E1/B1"   // ~1575.42
+            mhz in 1197.0..1214.0 -> "L5/E5a"      // ~1176/1207
+            mhz in 1200.0..1214.5 -> "E5b"
+            mhz in 1223.0..1231.0 -> "L2"          // ~1227.6
+            mhz in 1596.0..1610.0 -> "G1"          // GLONASS L1
+            mhz in 1242.0..1252.0 -> "G2"          // GLONASS L2
+            else -> "%.0f MHz".format(mhz)
         }
     }
 

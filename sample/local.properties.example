@@ -11,9 +11,6 @@
 # keystore. An emulator / CI can't produce production attestation; the SDK's
 # sandbox-bootstrap path for those is covered in the repository's INTEGRATION.md,
 # but is intentionally not wired into this sample. Sign up at https://octetproof.com.
-#
-# The build reads these here first, then falls back to the multi-project root
-# (octet-sdk/android/local.properties).
 
 # Still REQUIRED by OctetConfig, but as of 2.0.0 NOT the activation credential —
 # the SDK activates by attestation, not by this value. Leave as-is unless Octet
@@ -31,3 +28,8 @@ octet.activationServerUrl=https://api.octetproof.com
 # it to your Play Console app, and put its project NUMBER (not the ID) here. Leave
 # commented out to build without Play Integrity.
 #   octet.playIntegrityCloudProjectNumber=123456789012
+
+# (Optional) Your own OpenCelliD API key (free at https://opencellid.org) for real
+# cell-tower positions in the cell demo. Leave commented out and the demo falls
+# back to estimated positions, shown with a badge.
+#   octet.openCellIdKey=YOUR_OPENCELLID_KEY

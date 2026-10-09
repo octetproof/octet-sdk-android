@@ -6,9 +6,9 @@ import kotlin.reflect.KProperty
 
 /**
  * Sample preferences, persisted in SharedPreferences and Compose-observable.
- * Mirrors iOS AppSettings. The debug-tier toggles (`semanticV2`, `verboseLogs`)
- * are only surfaced in the hidden menu behind `BuildConfig.DEBUG`, so a release
- * build never shows them; the stored values are harmless either way.
+ * Mirrors iOS AppSettings. The debug-tier toggle (`verboseLogs`)
+ * is only surfaced in the hidden menu behind `BuildConfig.DEBUG`, so a release
+ * build never shows it; the stored value is harmless either way.
  */
 class AppSettings(context: Context) {
     private val prefs = context.getSharedPreferences("octet_sample_settings", Context.MODE_PRIVATE)
@@ -32,6 +32,5 @@ class AppSettings(context: Context) {
     var devMenuUnlocked: Boolean by BoolPref("devMenuUnlocked", false)
 
     // Debug-tier (only read/shown behind BuildConfig.DEBUG).
-    var semanticV2: Boolean by BoolPref("semanticV2", false)
     var verboseLogs: Boolean by BoolPref("verboseLogs", false)
 }

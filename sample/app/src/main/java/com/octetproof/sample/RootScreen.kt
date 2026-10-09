@@ -67,6 +67,8 @@ fun RootScreen(vm: SampleViewModel) {
             composable("devSettings") { DevSettingsScreen(vm, nav) }
             composable("sensors") { SensorsScreen(nav) }
             composable("sensorMap") { SensorMapScreen(nav) }
+            composable("gnssSky") { GnssSkyScreen(nav) }
+            composable("fixMap") { FixMapScreen(nav) }
             composable(
                 "verifyDetail/{id}",
                 arguments = listOf(navArgument("id") { type = NavType.StringType }),

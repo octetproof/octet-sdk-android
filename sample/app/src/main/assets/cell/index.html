@@ -1,0 +1,291 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<link rel="stylesheet" href="leaflet/leaflet.css" />
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin:0; height:100%; background:#04070a; overflow:hidden;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; color:#cfe8ff; }
+  #map { position:fixed; inset:0; background:#04070a; }
+  .leaflet-container { background:#04070a; }
+
+  #bar { position:fixed; top:calc(8px + env(safe-area-inset-top,0px)); left:10px; right:10px; z-index:600;
+    display:flex; align-items:flex-start; gap:10px; pointer-events:none; }
+  #bar .btn { pointer-events:auto; background:rgba(6,12,22,0.92); border:1px solid #1c4b6e; border-radius:8px;
+    padding:6px 11px; font:inherit; font-size:12px; color:#cfe8ff; }
+  #bar .mid { flex:1; }
+  #bar .title { color:#5eead4; font-weight:600; letter-spacing:.08em; font-size:12.5px; }
+  #bar .status { color:#94a3b8; font-size:11px; margin-top:2px; } #bar .status .on { color:#f5c451; }
+  #badge { pointer-events:none; color:#f59e0b; background:rgba(30,20,4,0.7); border:1px solid #4a3a12; border-radius:6px; padding:3px 7px; font-size:10px; display:none; }
+
+  #detail { position:fixed; top:calc(70px + env(safe-area-inset-top,0px)); right:10px; width:216px; max-width:66vw; z-index:600;
+    background:rgba(6,12,20,0.95); border:1px solid #1c4b6e; border-radius:8px; padding:9px 11px; font-size:11px; line-height:1.5; display:none; }
+  #detail .h { color:#5eead4; font-weight:600; } #detail .x { position:absolute; top:5px; right:9px; color:#6b8ba4; }
+  #detail .badge { font-size:9px; padding:1px 5px; border-radius:4px; margin-left:5px; }
+  #detail .real { background:#123a2a; color:#4ade80; border:1px solid #1f6b48; }
+  #detail .est  { background:#0f2c3f; color:#7cc4e6; border:1px solid #1c4b6e; }
+  #detail .demo { background:#3a2a12; color:#f0b866; border:1px solid #6b4a1f; }
+  #detail .row { display:flex; justify-content:space-between; gap:6px; align-items:center; }
+  #detail .k { color:#6b8ba4; } #detail .v { color:#eaf6ff; }
+  #detail .i { color:#3f6a86; margin-left:4px; cursor:pointer; } #detail .exp { color:#8fb0c6; font-size:10px; line-height:1.35; margin:1px 0 4px; display:none; }
+
+  #err { position:fixed; top:calc(70px + env(safe-area-inset-top,0px)); left:10px; z-index:600; font-size:10px; color:#ff8a8a; pointer-events:none; }
+
+  #panel { position:fixed; left:10px; right:10px; bottom:calc(10px + env(safe-area-inset-bottom,0px)); z-index:600;
+    background:rgba(6,12,20,0.94); border:1px solid #163a54; border-radius:10px; padding:9px 12px; }
+  #panel .cav { color:#f0b866; font-size:11px; line-height:1.4; } #panel .cav b { color:#ffd27a; }
+  .ctl { display:flex; align-items:center; gap:9px; margin-top:8px; }
+  .ctl .lab { color:#a9c4d8; font-size:11.5px; white-space:nowrap; } .ctl .lab b { color:#5eead4; }
+  #tsl { -webkit-appearance:none; appearance:none; flex:1; height:4px; border-radius:3px; background:#183247; outline:none; }
+  #tsl::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:#5eead4; border:2px solid #04141c; }
+  .chk { display:flex; align-items:center; gap:7px; color:#a9c4d8; font-size:11.5px; cursor:pointer; }
+  .chk input { width:16px; height:16px; accent-color:#5eead4; }
+  #panel .foot { display:flex; justify-content:space-between; align-items:center; margin-top:8px; gap:8px; }
+  #panel .off { color:#a9c4d8; font-size:11.5px; flex:1; } #panel .off b { color:#5eead4; }
+  #panel button.act { background:rgba(10,22,34,0.9); border:1px solid #1c4b6e; border-radius:7px; padding:8px 15px; font:inherit; font-size:12px; color:#cfe8ff; }
+  #panel button.act:disabled { opacity:0.4; }
+
+  #prompt { position:fixed; left:10px; right:10px; bottom:calc(10px + env(safe-area-inset-bottom,0px)); z-index:610;
+    background:rgba(10,16,26,0.97); border:1px solid #4a3a12; border-radius:10px; padding:11px 13px; display:none; }
+  #prompt .q { color:#f0b866; font-size:12px; line-height:1.45; } #prompt .q b { color:#ffd27a; }
+  #prompt .btns { display:flex; gap:9px; margin-top:9px; }
+  #prompt button { flex:1; border-radius:8px; padding:9px 10px; font:inherit; font-size:12px; }
+  #prompt .yes { background:#2a2008; border:1px solid #6b4a1f; color:#ffd27a; }
+  #prompt .no  { background:rgba(10,22,34,0.9); border:1px solid #1c4b6e; color:#cfe8ff; }
+
+  #attrib { position:fixed; left:12px; bottom:calc(2px + env(safe-area-inset-bottom,0px)); z-index:590; font-size:8px; color:#33506a; pointer-events:none; }
+
+  .twr-lbl { font:11px ui-monospace,monospace; color:#cfe8ff; text-shadow:0 0 3px #000,0 0 3px #000; white-space:nowrap; }
+  .twr-lbl .b { font-size:8px; padding:0 3px; border-radius:3px; }
+  .twr-lbl .rb { background:#123a2a; color:#4ade80; } .twr-lbl .eb { background:#0f2c3f; color:#7cc4e6; } .twr-lbl .db { background:#3a2a12; color:#f0b866; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="bar">
+  <button class="btn" id="close">‹ Back</button>
+  <div class="mid"><div class="title">CELL TRIANGULATION</div><div class="status" id="status">scanning for cells…</div></div>
+  <span id="badge">◼ iOS: simulated</span>
+</div>
+<div id="detail"><span class="x" id="dx">✕</span><div id="dbody"></div></div>
+<div id="err"></div>
+
+<div id="panel">
+  <div class="cav" id="cav">Searching for cell towers nearby — <b>observed only, not integrity-proven</b>. A cell signal is not a location proof.</div>
+  <div class="ctl">
+    <span class="lab">Towers in fix: <b id="tval">4</b></span>
+    <input type="range" id="tsl" min="3" max="8" step="1" value="4" />
+  </div>
+  <label class="chk"><input type="checkbox" id="demo" /> Add demo towers if too few real ones</label>
+  <div class="foot"><span class="off" id="off">&nbsp;</span><button class="act" id="run" disabled>Triangulate</button></div>
+</div>
+
+<div id="prompt">
+  <div class="q" id="pq">Only <b id="pn">0</b> cells found after 30 s. There may not be enough real towers here to triangulate. Add <b>demo towers</b> to complete the picture, or keep searching?</div>
+  <div class="btns"><button class="yes" id="pyes">Add demo towers</button><button class="no" id="pno">Keep searching</button></div>
+</div>
+
+<div id="attrib">© Esri · © OpenStreetMap · cell positions: OpenCelliD (CC-BY-SA) / estimated</div>
+
+<script src="leaflet/leaflet.js"></script>
+<script>
+window.onerror=function(m,s,l){var e=document.getElementById("status"); if(e) e.textContent="err: "+m+" @"+l; return false;};
+(function(){
+  "use strict";
+  var TECHCOL={ "5G":"#b07bff", "LTE":"#37c8c8", "3G":"#f5a623", "2G":"#9aa6b2" };
+  var GLOSS={
+    "MCC / MNC":"Mobile Country Code + Mobile Network Code — together they identify the carrier and country this cell belongs to.",
+    "TAC":"Tracking Area Code — the LTE/5G region grouping many cells; the network uses it to know roughly where your phone is.",
+    "LAC":"Location Area Code — the 2G/3G equivalent of a Tracking Area: a group of cells the network tracks you across.",
+    "Cell ID":"The unique identifier of this specific antenna sector. With MCC/MNC/area it names exactly one tower sector worldwide.",
+    "PCI":"Physical Cell ID — a short code (0–503) that lets your phone tell neighbouring LTE/5G cells apart on the airwaves.",
+    "PSC":"Primary Scrambling Code — the 3G equivalent of PCI, distinguishing nearby cells.",
+    "Channel":"The radio channel/frequency the cell uses (EARFCN/ARFCN). Different bands travel and penetrate buildings differently.",
+    "Signal":"Received signal strength in dBm (closer to 0 = stronger). We turn it into a rough distance — weaker means further away.",
+    "Est. range":"Our rough guess of how far you are from this tower, derived from signal strength. Very approximate — metres to kilometres."
+  };
+  var map, tileLayer, layer=null;
+  var data={towers:[], fix:null}, scene=null, t0=0, started=false, locked=false;
+  var target=4, demoEnabled=false, simulated=false, scanStart=0, promptShown=false, autoRan=false;
+  var C_M_PER_DEG_LAT=111320;
+
+  function estDistM(dbm){ return Math.max(40, Math.min(15000, 50*Math.pow(10,((-dbm)-60)/28))); }
+  function fmtM(m){ return m<1000? Math.round(m)+" m" : (m/1000).toFixed(m<10000?2:1)+" km"; }
+  function shortId(t){ return (t.cid!=null? String(t.cid).slice(-5) : (t.pci!=null? "p"+t.pci : "?")); }
+  function hash(s){ var h=2166136261>>>0; for(var i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619);} return h>>>0; }
+  function rng(seed){ var x=seed||123456789; return function(){ x^=x<<13; x^=x>>>17; x^=x<<5; x>>>=0; return x/4294967296; }; }
+
+  function init(){
+    map=L.map("map",{ zoomControl:false, attributionControl:false, fadeAnimation:true });
+    map.setView([51.5,-0.1], 12);
+    tileLayer=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom:16 }).addTo(map);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom:16 }).addTo(map);
+    document.getElementById("close").addEventListener("click",function(){ if(window.AndroidBridge&&AndroidBridge.close) AndroidBridge.close(); });
+    document.getElementById("dx").addEventListener("click",function(){ document.getElementById("detail").style.display="none"; });
+    document.getElementById("run").addEventListener("click",startRun);
+    var sl=document.getElementById("tsl");
+    sl.addEventListener("input",function(){ target=parseInt(sl.value,10); document.getElementById("tval").textContent=target;
+      if(started) startRun(); else onUpdate(); });
+    document.getElementById("demo").addEventListener("change",function(e){ demoEnabled=e.target.checked;
+      hidePrompt(); if(started) startRun(); else onUpdate(); });
+    document.getElementById("pyes").addEventListener("click",function(){ demoEnabled=true; document.getElementById("demo").checked=true; hidePrompt(); startRun(); });
+    document.getElementById("pno").addEventListener("click",hidePrompt);
+    map.on("click",function(e){ if(!scene) return; var best=null,bd=1e9;
+      scene.placed.forEach(function(p){ var q=map.latLngToContainerPoint([p.lat,p.lon]);
+        var d=q.distanceTo(e.containerPoint); if(d<bd){ bd=d; best=p; } });
+      if(best && bd<=40) showDetail(best); else document.getElementById("detail").style.display="none"; });
+    scanStart=performance.now();
+  }
+
+  function mPerLon(lat){ return C_M_PER_DEG_LAT*Math.cos(lat*Math.PI/180); }
+  function toM(lat,lon,o){ return { x:(lon-o.lon)*mPerLon(o.lat), y:(lat-o.lat)*C_M_PER_DEG_LAT }; }
+  function toLL(x,y,o){ return { lat:o.lat + y/C_M_PER_DEG_LAT, lon:o.lon + x/mPerLon(o.lat) }; }
+
+  window.setFix=function(lat,lon,acc){ data.fix={lat:lat,lon:lon,acc:acc}; onUpdate(); };
+  window.setTowers=function(json){ try{ data.towers=JSON.parse(json)||[]; }catch(e){} onUpdate(); };
+  window.showSimulatedBadge=function(on){ document.getElementById("badge").style.display=on?"block":"none";
+    if(on){ simulated=true; demoEnabled=true; document.getElementById("demo").checked=true; } };
+
+  // ---- categorise the accumulated towers ----
+  function isReal(t){ return t.real&&t.lat!=null&&t.lon!=null; }
+  function avail(){ return data.towers.length; } // every tower is real or estimated (both placeable)
+
+  // Decide whether to (auto-)run while still scanning, drive scan status + prompt.
+  function onUpdate(){
+    if(started) return;
+    var a=avail(), realN=data.towers.filter(isReal).length, estN=a-realN;
+    var el=(performance.now()-scanStart)/1000;
+    var run=document.getElementById("run"); run.disabled=(a<3 && !(demoEnabled));
+    status("scanning for cells… <span class='on'>"+realN+" real</span>"+(estN?" · "+estN+" estimated":""));
+    // auto-run once we've reached the requested count, or after a short grace with >=3
+    if(a>=target || (a>=3 && el>15)){ if(!autoRan){ autoRan=true; startRun(); } return; }
+    // too few real+observed cells to triangulate at all → suggest demo after 30 s
+    if(a<3 && !demoEnabled && el>30 && !promptShown){ showPrompt(a); }
+    if(demoEnabled && el>4){ if(!autoRan){ autoRan=true; startRun(); } } // demo can always fill in
+  }
+  function showPrompt(n){ promptShown=true; document.getElementById("pn").textContent=n;
+    document.getElementById("prompt").style.display="block"; document.getElementById("panel").style.opacity="0.25"; }
+  function hidePrompt(){ document.getElementById("prompt").style.display="none"; document.getElementById("panel").style.opacity="1"; }
+
+  function buildScene(){
+    var real=data.towers.filter(isReal), est=data.towers.filter(function(t){return !isReal(t);});
+    var o=data.fix ? {lat:data.fix.lat,lon:data.fix.lon}
+        : real.length ? {lat:real.reduce(function(a,t){return a+t.lat;},0)/real.length, lon:real.reduce(function(a,t){return a+t.lon;},0)/real.length}
+        : {lat:51.5074,lon:-0.1278};
+    // real first, then estimated, capped at the requested count
+    var chosen=[];
+    real.forEach(function(t){ chosen.push({t:t,kind:"real"}); });
+    est.forEach(function(t){ chosen.push({t:t,kind:"est"}); });
+    chosen=chosen.slice(0,target);
+    // top up with demo towers only when there aren't enough real/estimated to triangulate
+    if(chosen.length<3 && demoEnabled){ var need=Math.max(3,target)-chosen.length;
+      demoTowers().slice(0,need).forEach(function(t){ chosen.push({t:t,kind:"demo"}); }); }
+    var placed=[], r=rng(hash(chosen.map(function(c){return c.t.cid+"|"+c.t.pci;}).join("|")||"seed")+3);
+    chosen.forEach(function(c,i){ var t=c.t, dist=estDistM(t.dbm), lat,lon;
+      if(c.kind==="real"){ lat=t.lat; lon=t.lon; }
+      else { var brg=(i/chosen.length)*Math.PI*2 + (r()-0.5)*0.5, perp=(r()-0.5)*dist*0.22;
+        var x=Math.sin(brg)*dist+Math.cos(brg)*perp, y=Math.cos(brg)*dist-Math.sin(brg)*perp;
+        var ll=toLL(x,y,o); lat=ll.lat; lon=ll.lon; }
+      placed.push({t:t, lat:lat, lon:lon, r:dist, kind:c.kind, real:(c.kind==="real"), col:TECHCOL[t.tech]||"#9aa6b2"}); });
+    var est2=null, uncM=0;
+    if(placed.length>=3){
+      var pm=placed.map(function(p){ var m=toM(p.lat,p.lon,o); return {x:m.x,y:m.y,r:p.r}; });
+      var s=solve2d(pm); var ll=toLL(s.x,s.y,o); est2={lat:ll.lat,lon:ll.lon};
+      var rr=0; pm.forEach(function(p){ var d=Math.hypot(p.x-s.x,p.y-s.y)-p.r; rr+=d*d; }); rr=Math.sqrt(rr/pm.length);
+      var med=placed.map(function(p){return p.r;}).sort(function(a,b){return a-b;})[Math.floor(placed.length/2)];
+      uncM=Math.max(150, med*0.2 + rr);
+    }
+    var realN=placed.filter(function(p){return p.kind==="real";}).length;
+    var estN=placed.filter(function(p){return p.kind==="est";}).length;
+    var demoN=placed.filter(function(p){return p.kind==="demo";}).length;
+    return { o:o, placed:placed, est:est2, uncM:uncM, realN:realN, estN:estN, demoN:demoN, fix:data.fix };
+  }
+  function demoTowers(){ var spec=[["5G",-88,1],["LTE",-92,3],["LTE",-95,10],["3G",-90,1],["LTE",-99,7],["5G",-94,5],["3G",-101,1],["LTE",-97,3]]; var r=rng(0xCE11);
+    return spec.map(function(s,i){ return {tech:s[0],dbm:s[1]+Math.round((r()-0.5)*4),mcc:232,mnc:s[2],
+      area:10000+Math.floor(r()*50000),cid:100000+Math.floor(r()*900000),pci:Math.floor(r()*504),
+      channel:[1850,6300,3200,10700][i%4],reg:(i===0),real:false,lat:null,lon:null,rangeM:null}; }); }
+  function solve2d(ts){ var x=0,y=0; ts.forEach(function(t){x+=t.x;y+=t.y;}); x/=ts.length; y/=ts.length;
+    for(var it=0;it<14;it++){ var a=0,b=0,c=0,gx=0,gy=0;
+      for(var i=0;i<ts.length;i++){ var dx=x-ts[i].x,dy=y-ts[i].y,rr=Math.hypot(dx,dy)||1e-6,res=rr-ts[i].r,ux=dx/rr,uy=dy/rr;
+        a+=ux*ux; b+=ux*uy; c+=uy*uy; gx+=ux*res; gy+=uy*res; }
+      var det=a*c-b*b; if(Math.abs(det)<1e-9) break; var ddx=(c*gx-b*gy)/det, ddy=(a*gy-b*gx)/det; x-=ddx; y-=ddy;
+      if(ddx*ddx+ddy*ddy<1e-4) break; }
+    return {x:x,y:y}; }
+
+  // ---------- render + cinematic ----------
+  var anim=null;
+  function startRun(){
+    hidePrompt();
+    scene=buildScene(); started=true; locked=false;
+    document.getElementById("detail").style.display="none"; document.getElementById("off").innerHTML="&nbsp;";
+    document.getElementById("run").disabled=false; document.getElementById("run").textContent="▶ Replay";
+    var mix=[]; if(scene.realN) mix.push("<b>"+scene.realN+" real</b>"); if(scene.estN) mix.push(scene.estN+" estimated"); if(scene.demoN) mix.push(scene.demoN+" demo");
+    document.getElementById("cav").innerHTML = mix.join(" · ")+" cell"+(scene.placed.length===1?"":"s")+
+      (scene.demoN? " — <b>demo towers added</b> to fill in" : "")+". Observed, <b>not integrity-proven</b> — a cell signal is not a location proof.";
+    if(layer) map.removeLayer(layer); layer=L.layerGroup().addTo(map);
+    var pts=scene.placed.map(function(p){return [p.lat,p.lon];}); if(scene.fix) pts.push([scene.fix.lat,scene.fix.lon]);
+    if(pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.35), {animate:false});
+    if(scene.fix){ L.circleMarker([scene.fix.lat,scene.fix.lon],{radius:6,color:"#37c871",weight:2,fillColor:"#37c871",fillOpacity:0.9}).addTo(layer);
+      L.circle([scene.fix.lat,scene.fix.lon],{radius:Math.max(scene.fix.acc,8),color:"#37c871",weight:1,opacity:0.5,fill:false}).addTo(layer)
+        .bindTooltip("GNSS ±"+Math.round(scene.fix.acc)+"m",{permanent:true,direction:"right",className:"twr-lbl"}); }
+    scene.placed.forEach(function(p,i){ p.marker=null; p.ring=null; p.appear=0.4+i*0.28; });
+    t0=performance.now(); if(anim) cancelAnimationFrame(anim); anim=requestAnimationFrame(frame);
+  }
+
+  function frame(){ anim=requestAnimationFrame(frame);
+    if(!scene) return; var el=(performance.now()-t0)/1000, n=scene.placed.length;
+    var acqEnd=0.4+n*0.28, rngEnd=acqEnd+1.4, triEnd=rngEnd+1.3;
+    scene.placed.forEach(function(p){
+      if(el<p.appear) return;
+      if(!p.marker){ p.marker=L.circleMarker([p.lat,p.lon],{radius:0,color:p.col,weight:2,fillColor:p.col,fillOpacity:0.9}).addTo(layer);
+        var bcls=p.kind==="real"?"rb'>REAL":(p.kind==="demo"?"db'>DEMO":"eb'>EST");
+        p.marker.bindTooltip(p.t.tech+" "+shortId(p.t)+" <span class='b "+bcls+"</span>",{permanent:true,direction:"top",className:"twr-lbl",offset:[0,-4]});
+        p.marker.on("click",function(){ showDetail(p); }); }
+      var pop=Math.min(1,(el-p.appear)/0.3); p.marker.setRadius(6*pop);
+      var grow = el<acqEnd?0:Math.min(1,(el-acqEnd)/1.4);
+      if(grow>0){ if(!p.ring){ p.ring=L.circle([p.lat,p.lon],{radius:1,color:p.col,weight:1.5,opacity:0.85,fillColor:p.col,fillOpacity:0.05}).addTo(layer); }
+        p.ring.setRadius(p.r*ease(grow)); }
+    });
+    if(el<0.4) status("acquiring cells…");
+    else if(el<acqEnd) status("acquiring cells… <span class='on'>"+Math.min(n,Math.floor((el-0.4)/0.28)+1)+"/"+n+"</span>");
+    else if(el<rngEnd) status("estimating ranges from signal…");
+    else if(el<triEnd) status("triangulating…");
+    else { status("<span class='on'>LOCK</span> · cell estimate (coarse)"); if(!locked){ locked=true; onLock(); } }
+  }
+  function ease(p){ return p<0.5?2*p*p:1-Math.pow(-2*p+2,2)/2; }
+  function status(s){ document.getElementById("status").innerHTML=s; }
+
+  function onLock(){ if(!scene.est){ document.getElementById("off").innerHTML="need ≥3 cells to triangulate"; return; }
+    L.circle([scene.est.lat,scene.est.lon],{radius:scene.uncM,color:"#f5c451",weight:1.5,dashArray:"5 4",fill:false}).addTo(layer);
+    var xIcon=L.divIcon({className:"", html:"<div style='color:#f5c451;font:700 20px ui-monospace;transform:translate(-9px,-13px)'>✕</div>"});
+    L.marker([scene.est.lat,scene.est.lon],{icon:xIcon}).addTo(layer)
+      .bindTooltip("CELL ESTIMATE",{permanent:true,direction:"right",className:"twr-lbl",offset:[6,0]});
+    if(scene.fix){ L.polyline([[scene.est.lat,scene.est.lon],[scene.fix.lat,scene.fix.lon]],{color:"#f5c451",weight:1,opacity:0.6,dashArray:"3 3"}).addTo(layer);
+      var d=map.distance([scene.est.lat,scene.est.lon],[scene.fix.lat,scene.fix.lon]);
+      document.getElementById("off").innerHTML="CELL vs GNSS: <b>"+fmtM(d)+"</b> · est. ±"+fmtM(scene.uncM); }
+    else document.getElementById("off").innerHTML="cell est. ±"+fmtM(scene.uncM)+(scene.demoN?" (incl. demo)":"");
+  }
+
+  function showDetail(p){ var t=p.t, d=document.getElementById("detail");
+    function irow(k,v){ var g=GLOSS[k]; return '<div class="row"><span class="k">'+k+(g?' <span class="i" data-k="'+k+'">ⓘ</span>':'')+'</span><span class="v">'+v+'</span></div>'+(g?'<div class="exp" data-exp="'+k+'">'+g+'</div>':''); }
+    var mm=(t.mcc!=null?t.mcc:"—")+" / "+(t.mnc!=null?t.mnc:"—");
+    var badge=p.kind==="real"?'<span class="badge real">REAL · OpenCelliD</span>'
+      :(p.kind==="demo"?'<span class="badge demo">DEMO</span>':'<span class="badge est">estimated</span>');
+    document.getElementById("dbody").innerHTML='<div class="h">'+t.tech+' · '+shortId(t)+badge+(t.reg?' ⦿':'')+'</div>'+
+      irow("MCC / MNC",mm)+ irow(t.tech==="LTE"||t.tech==="5G"?"TAC":"LAC", t.area!=null?t.area:"—")+
+      irow("Cell ID",t.cid!=null?t.cid:"—")+ irow(t.tech==="3G"?"PSC":"PCI", t.pci!=null?t.pci:"—")+
+      irow("Channel",t.channel!=null?t.channel:"—")+ irow("Signal",t.dbm+" dBm")+ irow("Est. range",fmtM(p.r));
+    d.style.display="block";
+    Array.prototype.forEach.call(d.querySelectorAll(".i"),function(el){ el.addEventListener("click",function(){
+      var e=d.querySelector('.exp[data-exp="'+el.getAttribute("data-k")+'"]'); if(e) e.style.display=e.style.display==="block"?"none":"block"; }); });
+  }
+
+  if(document.readyState!=="loading") init(); else window.addEventListener("DOMContentLoaded",init);
+})();
+</script>
+</body>
+</html>
