@@ -144,9 +144,10 @@ class SampleViewModel(app: Application) : AndroidViewModel(app) {
                 val config = OctetConfig(
                     licenseKey = BuildConfig.OCTET_LICENSE_KEY,
                     proofUploadUrl = if (settings.uploadsEnabled) BuildConfig.OCTET_ACTIVATION_SERVER_URL else null,
+                    creditServiceUrl = channelCreditServiceUrl(BuildConfig.OCTET_ACTIVATION_SERVER_URL),
                     advanced = AdvancedConfig(
                         activationServerUrl = BuildConfig.OCTET_ACTIVATION_SERVER_URL,
-                        logLevel = if (settings.verboseLogs) LogLevel.VERBOSE else LogLevel.INFO,
+                        logLevel = channelLogLevel(getApplication()),
                         playIntegrityCloudProjectNumber =
                             BuildConfig.OCTET_PI_CLOUD_PROJECT.takeIf { it != 0L }),
                 )

@@ -70,6 +70,6 @@ the map location, under `app/src/main/java/com/octetproof/sample/`:
 | Area | Files |
 |---|---|
 | App shell / model | `MainActivity.kt`, `RootScreen.kt`, `SampleViewModel.kt`, `AppSettings.kt` |
-| Generate | `GenerateScreen.kt` (pipeline, map, region sheet, result, curated debug feed) |
+| Generate | `GenerateScreen.kt` (pipeline, map, region sheet, result) |
 | Verify + proofs | `VerifyScreen.kt`, `ProofStore.kt`, `Models.kt`, `Regions.kt` |
-| Shared | `Theme.kt`, `Scaffolds.kt` |
+| Shared | `Theme.kt`, `Scaffolds.kt`, `InfoDot.kt` |

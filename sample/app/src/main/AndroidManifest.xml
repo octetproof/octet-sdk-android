@@ -12,15 +12,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
 
-    <!-- Sensors diagnostics screen: serving cell + neighbouring towers, and the
-         Wi-Fi scan list (all best-effort; the screen degrades gracefully). -->
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
-    <uses-permission
-        android:name="android.permission.NEARBY_WIFI_DEVICES"
-        tools:targetApi="tiramisu" />
-
     <!-- osmdroid fetches OpenStreetMap tiles over HTTP and caches them
          to local disk. Both permissions are required for the map view. -->
     <uses-permission android:name="android.permission.INTERNET" />

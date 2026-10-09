@@ -54,7 +54,7 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 
-/** The Generate tab: pipeline + region picker + map + generate + result + debug. */
+/** The Generate tab: pipeline + region picker + map + generate + result. */
 @Composable
 fun GenerateScreen(vm: SampleViewModel, nav: NavController) {
     var regionSheet by remember { mutableStateOf(false) }
@@ -121,7 +121,7 @@ fun GenerateScreen(vm: SampleViewModel, nav: NavController) {
             }
         }
         vm.lastResult?.let { item { ResultCard(it, nav) } }
-        if (vm.settings.showDebug) item { DebugCard(vm) }
+        channelGenerateExtras(vm)
     }
 
     if (regionSheet) {
@@ -136,13 +136,7 @@ fun GenerateScreen(vm: SampleViewModel, nav: NavController) {
 
 @Composable
 private fun Header(vm: SampleViewModel, nav: NavController) {
-    var taps by remember { mutableStateOf(0) }
-    Column(
-        modifier = Modifier.fillMaxWidth().clickable {
-            taps += 1
-            if (taps >= 5) { taps = 0; vm.settings.devMenuUnlocked = true; nav.navigate("devSettings") }
-        },
-    ) {
+    Column(modifier = Modifier.fillMaxWidth().channelTitleTap(nav)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Octetproof", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text("  · Sample", style = MaterialTheme.typography.titleMedium, color = Color.Gray)
@@ -246,18 +240,6 @@ private fun BatteryLine(b: BatteryCost) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(text, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
         InfoDot("Battery used")
-    }
-}
-
-@Composable
-private fun DebugCard(vm: SampleViewModel) {
-    SampleCard {
-        Text("DEBUG (${vm.debug.size})", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-        Spacer(Modifier.height(4.dp))
-        vm.debug.takeLast(50).forEach { line ->
-            Text(line.text, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, color = Color.Gray)
-        }
-        Text("no coordinates · keys · tokens · IDs shown", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
     }
 }
 
