@@ -5,6 +5,54 @@ All notable changes to the OctetSDK for Android are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.0.0] — 2026-10-09
+
+> Major release, in lockstep with iOS 3.0.0. Read _Changed (breaking)_ before upgrading.
+
+### Changed (breaking)
+
+- **Usage reporting is always on.** The SDK sends one usage record per device per day. It
+  carries no location, no proof data and no user identity, and it never delays a proof.
+  Setting `creditServiceUrl` no longer turns it off. See "Usage reporting" in
+  INTEGRATION.md.
+- **A pinned `claimedRegion` must be an assigned ISO 3166 code.** Any other value produces
+  no proof.
+- **An attached debugger refuses a proof (`TAMPERING`)**, as on iOS. A sandbox session
+  (`sandboxBypassToken` set) still allows one.
+- **`BootstrapReason` gains `NewDevicesBlocked`.** A `when (reason)` without an `else`
+  branch no longer compiles. Add the new case or an `else` branch.
+- **Recompile against 3.0.** `AdvancedConfig` and `LicenseStatus` gained constructor
+  parameters with defaults. Source using named arguments compiles unchanged.
+
+### Added
+
+- **`TransportPolicy`** (`OctetConfig.advanced.transport`) sends all of the SDK's network
+  calls through a gateway you run, or through Octet's hosted gateway. Direct mode, the
+  default, is unchanged. See "Routing all SDK traffic through your own gateway" in
+  INTEGRATION.md for the options, the route table and reference configs.
+- **`LocationProof.spoofingVerdict`**: the proof's assurance tier, also `spoofing_verdict`
+  in the proof JSON. Read it to decide what a `YES` is worth.
+- **`VerifyOptions.requireVerdict`**: `Octet.verify` fails a proof below the tier you
+  require, matching `octet-verify --require-verdict`.
+- **`OctetConfig.advanced.acceptPlausibleContainment`** (default off) lets `contains(...)`
+  and disc queries answer from a `PLAUSIBLE` proof.
+- **`BootstrapReason.NewDevicesBlocked`**: a typed startup failure when the account accepts
+  no new devices. Open its `upgradeUrl` exactly as received.
+
+### Changed
+
+- The first proof after `Octet.start` can wait up to 30 s for startup to finish instead of
+  returning `NO_FIX`. Allow for this if your app times out its first call.
+- If you verify proofs yourself with `octet-verify`, use 1.5.0 or later.
+- If you enabled certificate pinning with 2.0, upgrade to 3.0, which carries updated pins.
+- **Dependencies:** `protobuf-javalite` and `protobuf-kotlin-lite` 3.25.9 (exposed as
+  `api`) and `kotlin-stdlib` 2.1.21. `minSdk` stays 30.
+
+### Fixed
+
+- If `Octet.start` runs before the app has a location permission, proofs work as soon as
+  the permission is granted, without restarting the app.
+
 ## [2.0.0] — 2026-09-09
 
 > Major release, in lockstep with iOS 2.0.0. Two things make it major. First,
@@ -13,8 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > Google's hardware attestation root), and obtains its licence by attested bootstrap,
 > replacing the pasted-license-key activation step. Second, the proof surface grows — a public
 > on-device **verifier** (`Octet.verify`), a public teardown (`OctetSdk.close()`), a
-> cache-bypass (`forceFresh`), an experimental permissionless location estimate —
-> and **semantic-binding v2 becomes the default proof form**. **Read _Changed
+> cache-bypass (`forceFresh`) — and **semantic-binding v2 becomes the default proof form**. **Read _Changed
 > (breaking)_ before upgrading:** the activation change is integration-level, and
 > two verdicts now refuse where they previously returned a misleading positive.
 >
@@ -61,14 +108,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   for this call — for a caller that needs a just-now measurement rather than a
   buffered one. Omitted (the default), behaviour is unchanged: the cache is
   consulted.
-
-- **Permissionless location estimate (experimental, opt-in).** With
-  `advanced.enableLocationEstimator`, a predicate made while the app holds no
-  location permission returns a signed, coarse `OctetVerdict.estimate` instead of
-  failing outright. `OctetVerdict.proof` is always `null` on that path, and a verdict
-  never carries both — so an estimate can never be read as a proof. **This is not a
-  proof pathway:** the radii are conservative bounds, not measured error, and
-  consent for deriving location remains yours.
 
 - **`regionFromJson`.** The inverse of `OctetRegion.toJson()` / `toJsonl()`:
   decodes the same stable tagged shape the forward direction emits, round-tripping

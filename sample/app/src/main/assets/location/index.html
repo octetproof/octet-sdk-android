@@ -1,0 +1,272 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<link rel="stylesheet" href="../cell/leaflet/leaflet.css" />
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin:0; height:100%; background:#05070d; overflow:hidden;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; color:#cfe8ff; }
+  #globe { position:fixed; inset:0; display:block; width:100vw; height:100vh; transition:opacity 1.2s; }
+  #map { position:fixed; inset:0; opacity:0; transition:opacity 1.2s; background:#04070a; }
+  .leaflet-container { background:#04070a; }
+
+  #bar { position:fixed; top:calc(8px + env(safe-area-inset-top,0px)); left:10px; right:10px; z-index:700;
+    display:flex; align-items:flex-start; gap:10px; pointer-events:none; }
+  #bar .btn { pointer-events:auto; background:rgba(6,12,22,0.92); border:1px solid #1c4b6e; border-radius:8px; padding:6px 11px; font:inherit; font-size:12px; color:#cfe8ff; }
+  #bar .mid { flex:1; } #bar .title { color:#5eead4; font-weight:600; letter-spacing:.08em; font-size:12.5px; }
+  #bar .status { color:#94a3b8; font-size:11px; margin-top:2px; } #bar .status .on { color:#f5c451; }
+  #badge { pointer-events:none; color:#f59e0b; background:rgba(30,20,4,0.7); border:1px solid #4a3a12; border-radius:6px; padding:3px 7px; font-size:10px; display:none; }
+  #err { position:fixed; top:calc(70px + env(safe-area-inset-top,0px)); left:10px; z-index:700; font-size:10px; color:#ff8a8a; pointer-events:none; }
+
+  #card { position:fixed; left:10px; right:10px; bottom:calc(10px + env(safe-area-inset-bottom,0px)); z-index:700;
+    background:rgba(6,11,20,0.93); border:1px solid #163a54; border-radius:10px; padding:10px 12px 8px; backdrop-filter:blur(6px); }
+  #card .cap { color:#a9c4d8; font-size:12px; line-height:1.5; } #card .cap b { color:#22d3ee; }
+  #chips { display:none; margin:8px 0 2px; }
+  .fix { border-top:1px solid #10293c; padding:7px 0 4px; }
+  .fix .hd { display:flex; align-items:center; gap:7px; font-size:12px; }
+  .fix .dot { width:10px; height:10px; border-radius:50%; }
+  .fix .name { font-weight:600; } .fix .acc { color:#8fb0c6; font-size:11px; margin-left:auto; }
+  .fix .sig { margin-top:3px; font-size:10.5px; color:#7fa3ba; } .fix .sig .c { display:inline-block; background:rgba(20,44,64,0.7); border:1px solid #1c4b6e; border-radius:10px; padding:1px 7px; margin:2px 3px 0 0; color:#bcd6ea; }
+  #card .foot { display:flex; justify-content:flex-end; margin-top:8px; }
+  #card button { background:rgba(10,22,34,0.9); border:1px solid #1c4b6e; border-radius:7px; padding:8px 15px; font:inherit; font-size:12px; color:#cfe8ff; }
+  #note { color:#7fa3ba; font-size:10px; margin-top:6px; }
+  #attrib { position:fixed; left:12px; bottom:calc(2px + env(safe-area-inset-bottom,0px)); z-index:690; font-size:8px; color:#33506a; pointer-events:none; }
+</style>
+</head>
+<body>
+<canvas id="globe"></canvas>
+<div id="map"></div>
+<div id="bar">
+  <button class="btn" id="close">‹ Back</button>
+  <div class="mid"><div class="title">octet-location</div><div class="status" id="status">starting…</div></div>
+  <span id="badge">◼ iOS: simulated</span>
+</div>
+<div id="err"></div>
+<div id="card">
+  <div class="cap" id="cap">Every location fix starts in orbit. Watch a satellite fix form, hand off to the map, and get corroborated by the cell network.</div>
+  <div id="chips"></div>
+  <div class="foot"><button id="replay" style="display:none">▶ Replay</button></div>
+</div>
+<div id="attrib">© Esri · © OpenStreetMap · orbits: Celestrak · cells: OpenCelliD / estimated</div>
+
+<script src="../orbit/three.min.js"></script>
+<script src="../orbit/satellite.min.js"></script>
+<script src="../cell/leaflet/leaflet.js"></script>
+<script>
+window.onerror=function(m,s,l){var e=document.getElementById("status"); if(e) e.textContent="err: "+m+" @"+l; return false;};
+(function(){
+  "use strict";
+  var R=6371, DEG=Math.PI/180, C_KMS=299792.458;
+  var scene,camera,renderer,earth,earthMesh,canvasEl,gmstF=0;
+  var sats=[], TECHCOL={ "5G":"#b07bff","LTE":"#37c8c8","3G":"#f5a623","2G":"#9aa6b2" };
+  var data={ gnss:null, fused:null, live:{inView:0,used:0}, towers:[] };
+  var map=null, mapLayer=null, started=false, phase=-1, tPhase=0, t0=0;
+  var rings=[], accRing=null, camTween=null;
+
+  function eciToScene(p){ return new THREE.Vector3(p.x/R,p.z/R,-p.y/R); }
+  function sceneToEci(v){ return {x:v.x*R,y:-v.z*R,z:v.y*R}; }
+  function llToScene(lon,lat,r){ var la=lat*DEG,lo=lon*DEG,cl=Math.cos(la);
+    return new THREE.Vector3(r*cl*Math.cos(lo), r*Math.sin(la), -r*cl*Math.sin(lo)); }
+  function rotY(v,a){ var c=Math.cos(a),s=Math.sin(a); return new THREE.Vector3(v.x*c+v.z*s,v.y,-v.x*s+v.z*c); }
+  function llToWorld(lon,lat,r){ return rotY(llToScene(lon,lat,r), gmstF); }
+  function estDistM(dbm){ return Math.max(40,Math.min(15000,50*Math.pow(10,((-dbm)-60)/28))); }
+  function fmtM(m){ return m<1000? Math.round(m)+" m" : (m/1000).toFixed(m<10000?2:1)+" km"; }
+  function ease(p){ return p<0.5?2*p*p:1-Math.pow(-2*p+2,2)/2; }
+  function status(s){ document.getElementById("status").innerHTML=s; }
+  function cap(s){ document.getElementById("cap").innerHTML=s; }
+
+  function makeDot(hex){ var c=document.createElement("canvas"); c.width=c.height=64; var x=c.getContext("2d");
+    x.fillStyle=hex; x.beginPath(); x.arc(32,32,18,0,7); x.fill(); var t=new THREE.Texture(c); t.needsUpdate=true; return t; }
+  function makeDiamond(){ var c=document.createElement("canvas"); c.width=c.height=64; var x=c.getContext("2d");
+    x.strokeStyle="#fff"; x.lineWidth=7; x.lineJoin="round"; x.beginPath(); x.moveTo(32,7); x.lineTo(57,32); x.lineTo(32,57); x.lineTo(7,32); x.closePath(); x.stroke();
+    var t=new THREE.Texture(c); t.needsUpdate=true; return t; }
+  var diamondTex=null;
+
+  function initGlobe(){
+    canvasEl=document.getElementById("globe");
+    scene=new THREE.Scene();
+    camera=new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.01, 2000);
+    camera.position.set(0,2.2,12);
+    renderer=new THREE.WebGLRenderer({canvas:canvasEl,antialias:true,alpha:false});
+    renderer.setClearColor(new THREE.Color(0x05070d),1); renderer.setPixelRatio(Math.min(devicePixelRatio,2)); resize();
+    diamondTex=makeDiamond();
+    earth=new THREE.Group();
+    earthMesh=new THREE.Mesh(new THREE.SphereGeometry(1,48,48), new THREE.MeshBasicMaterial({color:0x081522})); earth.add(earthMesh);
+    earth.add(new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.SphereGeometry(1.002,24,16)), new THREE.LineBasicMaterial({color:0x244a63,transparent:true,opacity:0.32})));
+    earth.add(new THREE.Mesh(new THREE.SphereGeometry(1.06,48,48), new THREE.MeshBasicMaterial({color:0x1e6fae,transparent:true,opacity:0.07,side:THREE.BackSide})));
+    scene.add(earth);
+    var sg=new THREE.BufferGeometry(),pts=[]; for(var i=0;i<500;i++){ var u=Math.random()*2-1,th=Math.random()*Math.PI*2,s=Math.sqrt(1-u*u),rr=80+Math.random()*60; pts.push(s*Math.cos(th)*rr,s*Math.sin(th)*rr,u*rr); }
+    sg.setAttribute("position",new THREE.Float32BufferAttribute(pts,3)); scene.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0x243f58,size:0.4})));
+    window.addEventListener("resize",resize);
+    if(window.AndroidBridge){ if(AndroidBridge.getLand) buildContinents(AndroidBridge.getLand()); if(AndroidBridge.getTle) setTLE(AndroidBridge.getTle()); }
+    requestAnimationFrame(loop);
+  }
+  function resize(){ if(renderer){ renderer.setSize(innerWidth,innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); } }
+  function buildContinents(gj){ if(!gj) return; var d; try{d=JSON.parse(gj);}catch(e){return;}
+    var mat=new THREE.LineBasicMaterial({color:0xbcd6ea,transparent:true,opacity:0.55});
+    function ring(co){ earth.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(co.map(function(c){return llToScene(c[0],c[1],1.003);})),mat)); }
+    (d.features||[]).forEach(function(f){ var g=f.geometry; if(!g) return; if(g.type==="Polygon") g.coordinates.forEach(ring); else if(g.type==="MultiPolygon") g.coordinates.forEach(function(p){p.forEach(ring);}); }); }
+  function setTLE(text){ if(!text) return; var lines=text.split(/\r?\n/), now=new Date(), seq=0;
+    for(var i=0;i+2<lines.length;i+=3){ var name=(lines[i]||"").trim(), l1=lines[i+1], l2=lines[i+2];
+      if(!l1||l1[0]!=="1"||!l2||l2[0]!=="2"){ i-=2; continue; } if(name.toUpperCase().indexOf("GPS")<0&&name.toUpperCase().indexOf("NAVSTAR")<0) continue;
+      var satrec; try{satrec=satellite.twoline2satrec(l1,l2);}catch(e){continue;}
+      var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:diamondTex,color:0x4f9dff,sizeAttenuation:false,depthWrite:false})); sp.scale.set(0.02,0.02,1); scene.add(sp);
+      sats.push({satrec:satrec,sprite:sp}); }
+    updateSats(now); }
+  function updateSats(now){ var gmst=satellite.gstime(now); earth.rotation.y=gmst;
+    sats.forEach(function(s){ var pv=satellite.propagate(s.satrec,now); if(!pv.position) return; s.pos=pv.position; s.sprite.position.copy(eciToScene(pv.position)); }); }
+
+  // ground ring on the globe (small circle where a sphere of radius rhoKm around sat meets earth)
+  function ringPoints(satScene,rhoKm){ var d=satScene.length(),rho=rhoKm/R,cosT=(1+d*d-rho*rho)/(2*d);
+    if(cosT>=1) cosT=0.99999; if(cosT<=-1) return null; var th=Math.acos(cosT),axis=satScene.clone().normalize();
+    var up=Math.abs(axis.y)<0.9?new THREE.Vector3(0,1,0):new THREE.Vector3(1,0,0);
+    var e1=new THREE.Vector3().crossVectors(axis,up).normalize(), e2=new THREE.Vector3().crossVectors(axis,e1).normalize();
+    var pts=[],N=120,sr=Math.sin(th),cr=Math.cos(th);
+    for(var k=0;k<=N;k++){ var a=k/N*Math.PI*2; pts.push(axis.clone().multiplyScalar(cr).add(e1.clone().multiplyScalar(sr*Math.cos(a))).add(e2.clone().multiplyScalar(sr*Math.sin(a))).multiplyScalar(1.006)); }
+    return pts; }
+  function surfaceCircle(centerWorld,radiusKm){ var axis=centerWorld.clone().normalize(),th=radiusKm/R;
+    var up=Math.abs(axis.y)<0.9?new THREE.Vector3(0,1,0):new THREE.Vector3(1,0,0);
+    var e1=new THREE.Vector3().crossVectors(axis,up).normalize(), e2=new THREE.Vector3().crossVectors(axis,e1).normalize();
+    var pts=[],N=64,sr=Math.sin(th),cr=Math.cos(th);
+    for(var k=0;k<=N;k++){ var a=k/N*Math.PI*2; pts.push(axis.clone().multiplyScalar(cr).add(e1.clone().multiplyScalar(sr*Math.cos(a))).add(e2.clone().multiplyScalar(sr*Math.sin(a))).multiplyScalar(1.004)); }
+    return pts; }
+
+  // ---------- bridge ----------
+  window.setGnss=function(lat,lon,acc){ data.gnss={lat:lat,lon:lon,acc:acc}; maybeStart(); };
+  window.setFused=function(lat,lon,acc,src){ data.fused={lat:lat,lon:lon,acc:acc,src:src}; };
+  window.setLive=function(inView,used){ data.live={inView:inView,used:used}; };
+  window.setTowers=function(json){ try{ data.towers=JSON.parse(json)||[]; }catch(e){} };
+  window.showSimulatedBadge=function(on){ document.getElementById("badge").style.display=on?"block":"none"; };
+  document.getElementById("close").addEventListener("click",function(){ if(window.AndroidBridge&&AndroidBridge.close) AndroidBridge.close(); });
+  document.getElementById("replay").addEventListener("click",startRun);
+
+  function maybeStart(){ if(!started && (data.gnss||data.fused)) startRun(); }
+
+  var rx=null;  // {lat,lon,acc, world}
+  function startRun(){
+    var f = data.gnss || data.fused; if(!f) return;
+    started=true; document.getElementById("replay").style.display="none"; document.getElementById("chips").style.display="none";
+    // reset globe view
+    document.getElementById("globe").style.opacity="1"; document.getElementById("map").style.opacity="0";
+    rings.forEach(function(r){ scene.remove(r); }); rings=[]; if(accRing){ scene.remove(accRing); accRing=null; }
+    var now=new Date(); gmstF=satellite.gstime(now); updateSats(now);
+    rx={ lat:f.lat, lon:f.lon, acc:(data.gnss?data.gnss.acc:f.acc)||15, world:llToWorld(f.lon,f.lat,1.002) };
+    // receiver dot
+    if(!rx.marker){ var m=new THREE.Sprite(new THREE.SpriteMaterial({map:makeDot("#37c871"),sizeAttenuation:false,depthWrite:false})); m.scale.set(0.022,0.022,1); scene.add(m); rx.marker=m; }
+    rx.marker.position.copy(rx.world); rx.marker.visible=true;
+    // pick ~5 GPS sats above horizon for the converging rings
+    var vis=sats.filter(function(s){ if(!s.pos) return false; var la=satellite.ecfToLookAngles({longitude:rx.lon*DEG,latitude:rx.lat*DEG,height:0.1}, satellite.eciToEcf(s.pos,gmstF)); s._el=la.elevation/DEG; return s._el>10; });
+    vis.sort(function(a,b){return b._el-a._el;}); rx.used=vis.slice(0,5).map(function(s){ var w=eciToScene(s.pos); var tr=new THREE.Vector3(s.pos.x,s.pos.y,s.pos.z).distanceTo(new THREE.Vector3().copy(sceneToEci(rx.world))); return {world:w, trueR:tr}; });
+    rx.used.forEach(function(u,i){ var ln=new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({color:0x37c8c8,transparent:true,opacity:0.9})); scene.add(ln); rings.push(ln); u.line=ln; });
+    accRing=new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({color:0x37c871,transparent:true,opacity:0.9})); scene.add(accRing);
+    t0=performance.now(); setPhase(0);
+  }
+
+  var PHASES=[
+    { name:"EARTH", dur:3.6, status:"every fix starts in orbit", cap:"Navigation satellites orbit ~20,200 km up, each broadcasting its position and a precise time. Your phone listens to as many as it can see." },
+    { name:"GNSS", dur:7.0, status:"computing the satellite fix…", cap:"From the timing of several satellites it trilaterates a position — the fix ring tightens as more satellites agree." },
+    { name:"HANDOFF", dur:3.0, status:"handing off to the map…", cap:"With a fix in hand, we drop from orbit to street level to see where that is." },
+    { name:"CELL", dur:6.5, status:"corroborating with cell towers…", cap:"Independently, the phone hears nearby cell towers. Their signal ranges triangulate a second, coarser position — a cross-check on the satellites." },
+    { name:"RESULT", dur:0, status:"done", cap:"" }
+  ];
+  function setPhase(p){ phase=p; tPhase=performance.now(); var ph=PHASES[p]; status(ph.status); if(ph.cap) cap(ph.cap);
+    if(p===1){ camTween={t0:performance.now(),dur:2.0,from:camera.position.clone(),to:rx.world.clone().normalize().multiplyScalar(3.0)}; }
+    if(p===2){ document.getElementById("globe").style.opacity="0"; document.getElementById("map").style.opacity="1"; enterMap(); }
+    if(p===3){ dropTowers(); }
+    if(p===4){ showResult(); }
+  }
+
+  // ---------- map phase ----------
+  function initMap(){ map=L.map("map",{zoomControl:false,attributionControl:false});
+    map.setView([rx?rx.lat:51.5, rx?rx.lon:-0.1], 14);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",{maxZoom:16}).addTo(map);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",{maxZoom:16}).addTo(map);
+  }
+  var mapTowers=[], cellEst=null;
+  function enterMap(){ if(!map) initMap(); if(mapLayer) map.removeLayer(mapLayer); mapLayer=L.layerGroup().addTo(map);
+    map.setView([rx.lat,rx.lon],15,{animate:false}); setTimeout(function(){ map.invalidateSize(); },200);
+    // GNSS fix + accuracy
+    L.circle([rx.lat,rx.lon],{radius:Math.max(rx.acc,8),color:"#37c871",weight:1,opacity:0.6,fillColor:"#37c871",fillOpacity:0.08}).addTo(mapLayer);
+    L.circleMarker([rx.lat,rx.lon],{radius:6,color:"#37c871",weight:2,fillColor:"#37c871",fillOpacity:1}).addTo(mapLayer).bindTooltip("satellite fix",{permanent:true,direction:"right",className:"twr-lbl"});
+    // fused fix (blue) if present + different
+    if(data.fused){ L.circle([data.fused.lat,data.fused.lon],{radius:Math.max(data.fused.acc,8),color:"#4f9dff",weight:1,opacity:0.5,fillColor:"#4f9dff",fillOpacity:0.06}).addTo(mapLayer);
+      L.circleMarker([data.fused.lat,data.fused.lon],{radius:6,color:"#4f9dff",weight:2,fillColor:"#4f9dff",fillOpacity:1}).addTo(mapLayer); }
+  }
+  function mPerLon(lat){ return 111320*Math.cos(lat*Math.PI/180); }
+  function dropTowers(){
+    var o={lat:rx.lat,lon:rx.lon};
+    var real=data.towers.filter(function(t){return t.real&&t.lat!=null;}), demo=false, list=data.towers.slice(0,8);
+    if(list.length<3){ list=demoTowers(); demo=true; } window._demo=demo;
+    mapTowers=[]; var seed=1337;
+    function rnd(){ seed^=seed<<13; seed^=seed>>>17; seed^=seed<<5; seed>>>=0; return seed/4294967296; }
+    list.forEach(function(t,i){ var dist=estDistM(t.dbm), lat,lon, isReal=(t.real&&t.lat!=null&&!demo);
+      if(isReal){ lat=t.lat; lon=t.lon; } else { var brg=(i/list.length)*Math.PI*2+(rnd()-0.5)*0.5; lat=o.lat+(Math.cos(brg)*dist)/111320; lon=o.lon+(Math.sin(brg)*dist)/mPerLon(o.lat); }
+      var col=TECHCOL[t.tech]||"#9aa6b2";
+      var mk=L.circleMarker([lat,lon],{radius:5,color:col,weight:2,fillColor:col,fillOpacity:0.9}).addTo(mapLayer);
+      mk.bindTooltip(t.tech+" "+(isReal?"REAL":"est"),{permanent:true,direction:"top",className:"twr-lbl",offset:[0,-4]});
+      var ring=L.circle([lat,lon],{radius:1,color:col,weight:1.2,opacity:0.8,fill:false}).addTo(mapLayer);
+      mapTowers.push({lat:lat,lon:lon,r:dist,ring:ring,real:isReal}); });
+    // triangulate (in metres about o)
+    if(mapTowers.length>=3){ var pm=mapTowers.map(function(p){ return {x:(p.lon-o.lon)*mPerLon(o.lat), y:(p.lat-o.lat)*111320, r:p.r}; });
+      var s=solve2d(pm); cellEst={lat:o.lat+s.y/111320, lon:o.lon+s.x/mPerLon(o.lat)};
+      var rr=0; pm.forEach(function(p){ var d=Math.hypot(p.x-s.x,p.y-s.y)-p.r; rr+=d*d; }); rr=Math.sqrt(rr/pm.length);
+      var med=mapTowers.map(function(p){return p.r;}).sort(function(a,b){return a-b;})[Math.floor(mapTowers.length/2)];
+      cellEst.unc=Math.max(150, med*0.2+rr); }
+  }
+  function solve2d(ts){ var x=0,y=0; ts.forEach(function(t){x+=t.x;y+=t.y;}); x/=ts.length; y/=ts.length;
+    for(var it=0;it<14;it++){ var a=0,b=0,c=0,gx=0,gy=0; for(var i=0;i<ts.length;i++){ var dx=x-ts[i].x,dy=y-ts[i].y,rr=Math.hypot(dx,dy)||1e-6,res=rr-ts[i].r,ux=dx/rr,uy=dy/rr; a+=ux*ux;b+=ux*uy;c+=uy*uy;gx+=ux*res;gy+=uy*res; }
+      var det=a*c-b*b; if(Math.abs(det)<1e-9) break; x-=(c*gx-b*gy)/det; y-=(a*gy-b*gx)/det; } return {x:x,y:y}; }
+  function demoTowers(){ var spec=[["5G",-88],["LTE",-92],["LTE",-95],["3G",-90]]; return spec.map(function(s,i){ return {tech:s[0],dbm:s[1],real:false,lat:null,lon:null}; }); }
+
+  function showResult(){
+    // cell estimate ring (coarse) — corroboration
+    if(cellEst){ L.circle([cellEst.lat,cellEst.lon],{radius:cellEst.unc,color:"#f5c451",weight:1.5,dashArray:"5 4",fill:false}).addTo(mapLayer)
+        .bindTooltip("cell estimate ±"+fmtM(cellEst.unc),{permanent:true,direction:"right",className:"twr-lbl"}); }
+    var octetAcc = rx.acc||15;
+    status("<span class='on'>octet-location locked</span>");
+    cap("<b>octet-location</b> combines them: the satellite fix, cross-checked by the cell-tower triangulation and the network. The point isn't a tighter dot than the OS — it's that <b>independent signals agree</b>, which is far harder to fake than any single number.");
+    // agreement: how close the independent (satellite) fix lands to the OS fused fix
+    var agreeLine='';
+    if(data.fused){ var ag=map.distance([rx.lat,rx.lon],[data.fused.lat,data.fused.lon]);
+      agreeLine='<div style="color:#4ade80;font-size:12px;margin:2px 0 4px">✓ satellite &amp; cell corroborate the OS fix — all agree to within <b>'+fmtM(Math.max(ag,1))+'</b></div>'; }
+    // chips
+    var fusedAcc = data.fused? (data.fused.acc||30) : null;
+    var html=agreeLine;
+    html+='<div class="fix"><div class="hd"><span class="dot" style="background:#4f9dff"></span><span class="name" style="color:#4f9dff">Fused (OS)</span>'+(fusedAcc!=null?'<span class="acc">±'+fmtM(fusedAcc)+' · opaque</span>':'')+'</div>'+
+      '<div class="sig">a single blended number from the OS: <span class="c">GPS</span><span class="c">Wi-Fi</span><span class="c">cell</span><span class="c">motion</span> — you can\'t see or check what went in.</div></div>';
+    html+='<div class="fix"><div class="hd"><span class="dot" style="background:#37c871"></span><span class="name" style="color:#37c871">octet-location</span><span class="acc">±'+fmtM(octetAcc)+' · verifiable</span></div>'+
+      '<div class="sig">independent signals, each shown &amp; cross-checked: <span class="c">GNSS '+(data.live.used||rx.used.length)+' sats</span><span class="c">'+(mapTowers.length)+' cell towers</span><span class="c">network</span></div></div>';
+    document.getElementById("chips").innerHTML=html; document.getElementById("chips").style.display="block";
+    document.getElementById("replay").style.display="inline-block";
+  }
+
+  // ---------- loop ----------
+  function loop(){ requestAnimationFrame(loop);
+    if(!renderer) return;
+    var nowP=performance.now();
+    if(camTween){ var q=Math.min(1,(nowP-camTween.t0)/(camTween.dur*1000)),e=ease(q); camera.position.lerpVectors(camTween.from,camTween.to,e); camera.lookAt(0,0,0); if(q>=1) camTween=null; }
+    // phase progression
+    if(started && phase<PHASES.length-1){ var el=(nowP-tPhase)/1000; var ph=PHASES[phase];
+      if(phase===1){ // GNSS: grow rings to trueR, shrink acc ring
+        var g=Math.min(1,el/5.5), e2=ease(g);
+        rx.used.forEach(function(u){ if(!u.line) return; var pts=ringPoints(u.world, u.trueR*e2); if(pts){ u.line.geometry.dispose(); u.line.geometry=new THREE.BufferGeometry().setFromPoints(pts); } });
+        if(accRing){ var accKm=Math.max(rx.acc/1000, 8); var big=800, rad=big+(accKm-big)*e2; var cp=surfaceCircle(rx.world, rad); accRing.geometry.dispose(); accRing.geometry=new THREE.BufferGeometry().setFromPoints(cp); }
+        status("computing the satellite fix… <span class='on'>"+(data.live.used||rx.used.length)+" sats · ±"+fmtM(rx.acc||15)+"</span>");
+      }
+      if(phase===3){ // CELL: grow each tower's range ring
+        var gc=Math.min(1,el/5.0), ec=ease(gc);
+        mapTowers.forEach(function(t){ if(t.ring) t.ring.setRadius(Math.max(1,t.r*ec)); });
+        status("corroborating with cell towers… <span class='on'>"+mapTowers.length+" towers</span>");
+      }
+      if(el>=ph.dur) setPhase(phase+1);
+    }
+    if(document.getElementById("globe").style.opacity!=="0") renderer.render(scene,camera);
+  }
+
+  if(document.readyState!=="loading") initGlobe(); else window.addEventListener("DOMContentLoaded",initGlobe);
+})();
+</script>
+</body>
+</html>

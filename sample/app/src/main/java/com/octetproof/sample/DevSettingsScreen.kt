@@ -67,7 +67,6 @@ fun DevSettingsScreen(vm: SampleViewModel, nav: NavController) {
         if (BuildConfig.DEBUG) {
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             SectionLabel("Developer (debug builds only)")
-            SwitchRow("Semantic-binding v2", s.semanticV2) { s.semanticV2 = it }
             SwitchRow("Verbose SDK logs (→ logcat)", s.verboseLogs) { s.verboseLogs = it }
             Text("Verbose logs raise the SDK log level; view them with `adb logcat`. This section is compiled out of release builds.",
                 style = MaterialTheme.typography.bodySmall, color = Color.Gray)

@@ -1,0 +1,16 @@
+Cell · Triangulation — bundled third-party assets & data
+
+leaflet/leaflet.js, leaflet.css   Leaflet 1.9.4   — BSD-2-Clause (https://leafletjs.com)
+leaflet/images/*                  Leaflet 1.9.4   — BSD-2-Clause
+
+Runtime network (not bundled):
+  Map tiles      Esri Dark Gray Canvas   — © Esri, © OpenStreetMap contributors
+                 (https://www.esri.com/; free basemap, no key).
+  Cell positions OpenCelliD              — CC-BY-SA 4.0 (https://opencellid.org).
+                 Looked up at runtime by (MCC,MNC,LAC/TAC,CID) ONLY when an API key
+                 is configured (local.properties → octet.openCellIdKey). The database
+                 is NOT redistributed/bundled; cells the DB does not know fall back to
+                 an on-device ESTIMATED position, clearly badged. No key → all estimated.
+
+Cell tower positions are never exposed by the OS. This screen is a visualization of
+observed cells; it is not a location proof.

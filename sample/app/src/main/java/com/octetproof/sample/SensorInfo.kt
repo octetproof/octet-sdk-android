@@ -48,6 +48,15 @@ val signalGlossary: Map<String, String> = mapOf(
     "Current draw" to "How much current the device is drawing right now, in milliamps — higher means more power use.",
     "Charge counter" to "The battery's remaining charge in mAh, read from the hardware fuel gauge.",
     "Battery used" to "How much battery this proof run consumed, from the hardware charge counter before and after. It can only be measured off-charger — while the device is plugged in there's nothing to measure.",
+    // GNSS · Sky satellite-detail params
+    "Constellation" to "Which satellite system this one belongs to — GPS (USA), Galileo (EU), GLONASS (Russia), BeiDou (China), QZSS (Japan). Seeing several systems is a sign of a genuine fix.",
+    "SVID / PRN" to "The satellite's ID number within its constellation — a name-plate that says exactly which satellite you're hearing.",
+    "Band" to "The radio frequency the satellite transmits on (e.g. GPS L1 near 1575 MHz). Modern phones track several bands at once for a better, harder-to-spoof fix.",
+    "C/N0" to "Carrier-to-noise density in dB-Hz — how clean the satellite's signal is. Higher is better: ~40+ is strong, under ~25 is weak.",
+    "Azimuth" to "The compass direction to the satellite (0° = North, 90° = East). With elevation, it pins the satellite's spot in the sky.",
+    "Elevation" to "How high the satellite sits above the horizon (0° = horizon, 90° = straight overhead). Higher satellites usually give a cleaner signal.",
+    "Ephemeris" to "Precise, short-lived orbit data broadcast by the satellite (valid ~4 h). The receiver needs it to use the satellite in a fix — 'cached' means it has a fresh copy.",
+    "Almanac" to "Coarse, long-lived orbit data for the whole constellation (valid for weeks). It helps the receiver find satellites fast, but isn't precise enough for the fix on its own.",
 )
 
 /** A small (i) button that opens a one-line explanation for a signal. */

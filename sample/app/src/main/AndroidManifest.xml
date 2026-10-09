@@ -41,6 +41,21 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".OrbitTheaterActivity"
+            android:exported="false"
+            android:label="GNSS · Orbits (3D)" />
+
+        <activity
+            android:name=".CellTheaterActivity"
+            android:exported="false"
+            android:label="Cell · Triangulation" />
+
+        <activity
+            android:name=".LocationTheaterActivity"
+            android:exported="false"
+            android:label="octet-location" />
+
         <service
             android:name="com.octetproof.sdk.internal.service.NavigateService"
             android:exported="false"

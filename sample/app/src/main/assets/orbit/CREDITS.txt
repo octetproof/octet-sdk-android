@@ -1,0 +1,12 @@
+GNSS Orbit Theater — bundled third-party assets
+
+three.min.js        three.js r128        — MIT License (https://github.com/mrdoob/three.js)
+OrbitControls.js    three.js r128        — MIT License (three.js examples)
+satellite.min.js    satellite.js 5.0.0   — MIT License (https://github.com/shashwatak/satellite-js)
+gnss.tle            GNSS TLE snapshot    — Celestrak (https://celestrak.org), US Space Force
+                                           public orbital data. Snapshot fetched 2026-09-20;
+                                           refresh periodically. Attribution: CelesTrak.
+
+All libraries are MIT-licensed and bundled offline (no runtime network fetch). The
+TLE file is a static snapshot; orbit accuracy degrades over weeks — refresh from
+Celestrak (GROUP=gnss, FORMAT=tle) to keep it current.
