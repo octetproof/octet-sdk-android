@@ -1,0 +1,228 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.octetproof",
+    "module": "sdk",
+    "version": "3.0.0",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.11.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseVariantReleaseApiPublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "com.google.protobuf",
+          "module": "protobuf-javalite",
+          "version": {
+            "requires": "3.25.9"
+          }
+        },
+        {
+          "group": "com.google.protobuf",
+          "module": "protobuf-kotlin-lite",
+          "version": {
+            "requires": "3.25.9"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.1.21"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "sdk-3.0.0.aar",
+          "url": "sdk-3.0.0.aar",
+          "size": 3912932,
+          "sha512": "1f1ce4e72f8c928c1d0144942f74540d6d517ff5a6f5346debb7d7cf9a3165f21fe4d66bd59b891be337c663d602bbd492a164a1e754fab1c0b96cf362d1df5f",
+          "sha256": "d27b99602cd8da16005ea83a84bc106c242b478b94ce7eceabe22639de4606cf",
+          "sha1": "da120ee016e296f93c626562fe6c175ea210683c",
+          "md5": "53a00a565f4663d4363c126100ce8cfa"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseRuntimePublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "com.octetproof",
+          "module": "libpf",
+          "version": {
+            "requires": "3.0.0"
+          }
+        },
+        {
+          "group": "androidx.core",
+          "module": "core-ktx",
+          "version": {
+            "requires": "1.9.0"
+          }
+        },
+        {
+          "group": "org.apache.commons",
+          "module": "commons-lang3",
+          "version": {
+            "requires": "3.12.0"
+          }
+        },
+        {
+          "group": "org.apache.commons",
+          "module": "commons-math3",
+          "version": {
+            "requires": "3.6.1"
+          }
+        },
+        {
+          "group": "org.ejml",
+          "module": "ejml-ddense",
+          "version": {
+            "requires": "0.46.1"
+          }
+        },
+        {
+          "group": "mil.nga",
+          "module": "tiff",
+          "version": {
+            "requires": "3.0.0"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-coroutines-core",
+          "version": {
+            "requires": "1.7.3"
+          }
+        },
+        {
+          "group": "com.google.android.gms",
+          "module": "play-services-location",
+          "version": {
+            "requires": "21.2.0"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-serialization-json",
+          "version": {
+            "requires": "1.6.3"
+          }
+        },
+        {
+          "group": "androidx.security",
+          "module": "security-crypto",
+          "version": {
+            "requires": "1.1.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jspecify",
+              "module": "jspecify"
+            }
+          ]
+        },
+        {
+          "group": "androidx.work",
+          "module": "work-runtime-ktx",
+          "version": {
+            "requires": "2.9.1"
+          }
+        },
+        {
+          "group": "androidx.lifecycle",
+          "module": "lifecycle-process",
+          "version": {
+            "requires": "2.5.1"
+          }
+        },
+        {
+          "group": "org.bouncycastle",
+          "module": "bcprov-jdk18on",
+          "version": {
+            "requires": "1.78.1"
+          }
+        },
+        {
+          "group": "com.google.android.play",
+          "module": "integrity",
+          "version": {
+            "requires": "1.6.0"
+          }
+        },
+        {
+          "group": "com.google.protobuf",
+          "module": "protobuf-javalite",
+          "version": {
+            "requires": "3.25.9"
+          }
+        },
+        {
+          "group": "com.google.protobuf",
+          "module": "protobuf-kotlin-lite",
+          "version": {
+            "requires": "3.25.9"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.1.21"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "sdk-3.0.0.aar",
+          "url": "sdk-3.0.0.aar",
+          "size": 3912932,
+          "sha512": "1f1ce4e72f8c928c1d0144942f74540d6d517ff5a6f5346debb7d7cf9a3165f21fe4d66bd59b891be337c663d602bbd492a164a1e754fab1c0b96cf362d1df5f",
+          "sha256": "d27b99602cd8da16005ea83a84bc106c242b478b94ce7eceabe22639de4606cf",
+          "sha1": "da120ee016e296f93c626562fe6c175ea210683c",
+          "md5": "53a00a565f4663d4363c126100ce8cfa"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseJavaDocPublication",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "javadoc",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "sdk-3.0.0-javadoc.jar",
+          "url": "sdk-3.0.0-javadoc.jar",
+          "size": 2011039,
+          "sha512": "86c3afa186fba79bb8c7293f7e1f2b6d71eda48cee3bf633a709d8bc35afa0a478ff1a7a667a0d8204beff7a49f1382c1013055e58d847f728641cf1ae6d1944",
+          "sha256": "7bb58c3d2f5c65de313480904987028d07dddfc4975db68c77a3cfbaad3d6d57",
+          "sha1": "0105f01b8ce82113d6321c6e45133614b7e5e93a",
+          "md5": "3fb1cab46071f38f58ccb57b996f3c2e"
+        }
+      ]
+    }
+  ]
+}
