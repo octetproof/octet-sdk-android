@@ -91,7 +91,7 @@ fun VerifyScreen(vm: SampleViewModel, nav: NavController) {
                             style = MaterialTheme.typography.labelSmall, color = Color.Gray,
                         )
                     }
-                    if (!proof.imported) Chip(proof.bucket.label, proof.bucket.tint.color())
+                    proof.bucket?.let { Chip(it.label, it.tint.color()) }
                 }
             }
         }

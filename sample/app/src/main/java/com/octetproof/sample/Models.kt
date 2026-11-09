@@ -20,7 +20,7 @@ data class StoredProof(
     val level: String,              // proof level, e.g. "ON_EARTH" / "COUNTRY"
     val generatedAtMs: Long,        // the proof's own signed timestamp
     val createdAtMs: Long,          // when this device stored it
-    val confidenceScore: Double,    // ConfidenceSummary.overallScore
+    val confidenceScore: Double? = null, // ConfidenceSummary.overallScore; null when the licence hides the score
     val predicateResult: String? = null, // "inside"/"outside"/"indeterminate"; null if imported
     val imported: Boolean = false,  // arrived via share rather than generated here
     val sizeBytes: Int,
@@ -28,20 +28,29 @@ data class StoredProof(
     val proofBytes: ByteArray
         get() = runCatching { Base64.decode(proofB64, Base64.DEFAULT) }.getOrDefault(ByteArray(0))
 
-    val bucket: ConfidenceBucket get() = ConfidenceBucket.of(confidenceScore)
+    /** null = nothing to grade: an imported proof, or a licence that hides the score.
+     *  Older records stored 0 for an imported proof, so `imported` is checked too. */
+    val bucket: ConfidenceBucket? get() = if (imported) null else ConfidenceBucket.of(confidenceScore)
 
     /** Stable content key for de-duplication (same proof bytes = same proof). */
     val contentKey: String get() = proofB64
 }
 
-/** Confidence tier — buckets `overallScore` so the UI reads at a glance. */
+/**
+ * Confidence tier — buckets `overallScore` so the UI reads at a glance.
+ *
+ * A licence that doesn't expose the score gets `overallScore = 0`. That is
+ * "not reported", not "weak", so there is no bucket at all (null) rather than a red LOW.
+ */
 enum class ConfidenceBucket(val label: String, val tint: StatusKind) {
     HIGH("HIGH", StatusKind.OK),
     MEDIUM("MEDIUM", StatusKind.WARN),
     LOW("LOW", StatusKind.BAD);
 
     companion object {
-        fun of(score: Double): ConfidenceBucket = when {
+        /** null when there is no score to grade. */
+        fun of(score: Double?): ConfidenceBucket? = when {
+            score == null -> null
             score >= 0.8 -> HIGH
             score >= 0.5 -> MEDIUM
             else -> LOW

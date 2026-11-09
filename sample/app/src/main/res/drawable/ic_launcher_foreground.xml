@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Store app (Octet Sample): the plain mark. Drawn on a 120-unit grid (as the iOS icon); the 66 dp safe zone keeps it whole under any launcher mask. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp" android:viewportWidth="120" android:viewportHeight="120">
+    <group android:pivotX="60" android:pivotY="60" android:scaleX="1" android:scaleY="1">
+        <group android:translateX="27" android:translateY="27" android:scaleX="0.524909" android:scaleY="0.524909">
+            <path android:fillColor="#FFFFFF" android:fillType="evenOdd"
+                android:pathData="M48.49177,113.43847c-4.12476,0-8.16323-1.67838-11.0799-4.60799l-20.32177-20.32177c-2.91667-2.89941-4.59505-6.93788-4.59505-11.06695v-28.7525c0-4.12476,1.67838-8.16323,4.60799-11.0799l20.32177-20.32177c2.89941-2.91667,6.93788-4.59505,11.06695-4.59505h28.7525c4.12476,0,8.16323,1.67838,11.0799,4.60799l20.32177,20.32177c2.91667,2.89941,4.59505,6.93788,4.59505,11.06695v28.7525c0,4.12476-1.67838,8.16323-4.60799,11.0799l-20.32177,20.32177c-2.89941,2.91667-6.93788,4.59505-11.06695,4.59505,0,0-28.7525,0-28.75251,0ZM62.86802,52.81401c-5.81177,0-10.54057,4.7288-10.54057,10.54057,0,5.81608,4.7288,10.54489,10.54057,10.54489s10.54057-4.7288,10.54057-10.54489c0-5.81177-4.7288-10.54057-10.54057-10.54057Z" />
+        </group>
+    </group>
+</vector>

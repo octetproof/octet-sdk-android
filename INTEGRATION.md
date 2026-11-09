@@ -21,21 +21,23 @@ cannot attest and carries no sandbox token fails closed.
 - Your app registered with Octet, so the backend recognises it. Sign up at
   [octetproof.com](https://octetproof.com).
 
-`OctetConfig.licenseKey` is still a field on the config type, but as of 2.0.0 it
-is **no longer the credential that activates the SDK** — it is retained for
-source compatibility and will be removed in a future release. (This is separate
-from Play Integrity, which remains an optional per-proof device attestation — see
-"Device attestation" below.)
+`OctetConfig.licenseKey` is deprecated. `Octet.start` ignores it, so leave it
+out: `OctetConfig()` needs no arguments. It will be removed in the next major
+version. (This is separate from Play Integrity, which remains an optional
+per-proof device attestation. See "Device attestation" below.)
 
 ### Emulator, CI, and non-attesting builds — sandbox bootstrap
 
-A build that can't produce production key attestation — an emulator, a CI runner,
+A build that can't produce hardware key attestation — an emulator, a CI runner,
 or a device without a hardware-backed keystore — activates instead with a
 **sandbox bootstrap token** set on `OctetConfig.sandboxBypassToken`, which you
 self-serve from your account at [octetproof.com](https://octetproof.com). A
-production (Play Store) build cannot use a sandbox token: the SDK refuses it
+release (Play Store) build cannot use a sandbox token: the SDK refuses it
 before the request is built, and the backend rejects a sandbox token for a
-production app row.
+release app row.
+
+The side an app lands on follows its signature, not its build type: an Android
+release build signed with the debug key lands on sandbox.
 
 ---
 
@@ -78,6 +80,35 @@ permission.
 
 ---
 
+## The location notification
+
+While the SDK collects location, Android shows an ongoing notification for its
+location foreground service. By default it reads "Location active" / "Confirming
+your location in the background", with a location icon, and a tap does nothing.
+It appears inside your app, so you can set your own:
+
+```kotlin
+val config = OctetConfig(
+    advanced = AdvancedConfig(
+        foregroundNotification = ForegroundNotification(
+            title = "Acme",
+            text = "Checking your location for this session",
+            smallIcon = R.drawable.ic_stat_acme,      // monochrome, not your launcher icon
+            channelId = "acme_status",                // optional: your own channel
+            contentIntent = openAppPendingIntent,     // optional: what a tap opens
+        ),
+    ),
+)
+```
+
+To build the whole notification yourself, set `provider` instead; the SDK then only
+shows and removes it. Create its channel before you return it.
+
+Android 14 and later crash an app whose foreground service posts a notification with
+a missing or adaptive small icon, or on a channel that doesn't exist. The SDK checks
+your settings first. If one would crash, it logs a warning (tag `OctetNotification`)
+and shows its default notification instead. `close()` removes the notification.
+
 ## Proof-upload data handling
 
 When you enable proof-upload by setting `OctetConfig.proofUploadUrl`,
@@ -97,7 +128,7 @@ within the retention window and persist it yourself.
 
 ## Usage telemetry
 
-The SDK collects **aggregate, privacy-preserving usage telemetry** and reports it
+The SDK collects **privacy-preserving usage telemetry** (counters and per-proof events) and reports it
 to the license backend (`POST /v1/metrics`), indexed by the license the SDK was
 activated with. It is **on by default** and disclosed under the Octet Terms &
 Conditions; disable it entirely by setting `telemetryEnabled = false` on your
@@ -116,23 +147,34 @@ SDK version and platform. Buffered in a single rolling file and uploaded at most
 once a day (with a best-effort flush when the app backgrounds); no background
 scheduler.
 
-**Additional diagnostic signals (remotely gated — off unless Octet enables
-them).** When enabled by remote configuration, the SDK adds a set of richer
-**aggregate** signals:
+**Additional diagnostic signals (remotely gated).** Octet turns these on through
+remote configuration, without an app release, and they are on for all licenses.
+To keep the base counters but not these, set `flagsEnabled = false`, which stops
+the SDK from receiving remote configuration. They add:
 
 - **Per-proof events** — one flat record per proof, every field a bucketed **enum
   label** (the proof level and internal quality labels). The one field beyond pure enums is a coarse
   **region identity** — an **ISO 3166 country / subdivision code** (e.g. `US`,
   `GB-ENG`), never finer than the level the proof already claims and bounded to
   ISO 3166 space, not free text. Still no coordinates.
+- **Background proof facts.** Every background proof can also report the country
+  or subdivision code the device was resolved to, whether or not your app asked
+  about that region. The reports also cover how the location was found (for
+  example GPS or the cell network), the proof's confidence and generation time as
+  ranges, and the app's location-permission state. Still no coordinates.
+- **Configuration exposure.** Which remote-configuration variant the device
+  received, with a pseudonymous device key, sent to `/v1/exposure`.
 - **Error diagnostics** — a count of `(error type, call site)` pairs for errors
   caught at the SDK's public API boundary, with any message mapped to a fixed enum
   (`license` / `region_decode` / … / `unknown`) — never the raw message, never
   PII; capped at 50 distinct pairs.
 
-**Your control.** All of the above — base and gated — stops entirely when
-`telemetryEnabled = false`: no counters are recorded, the persisted file is
-deleted, and `/v1/metrics` is never called.
+**Your control.** All of the above, base and gated, stops entirely when
+`telemetryEnabled = false`. No counters are recorded, the persisted file is
+deleted, and `/v1/metrics` and `/v1/exposure` are never called. Three requests
+continue: the license heartbeat, the remote-configuration fetch (SDK version,
+platform, OS version, app ID and a pseudonymous device key), and the daily usage
+record described below.
 
 ---
 
@@ -145,10 +187,10 @@ Console **Data safety** form. iOS ships the equivalent as a bundled
 
 | Data | Collected (leaves device) | Purpose | Linked to identity | Tracking |
 |---|---|---|---|---|
-| Precise location | Only if you set `proofUploadUrl` (proofs uploaded) | App functionality (location proofs) | No¹ | No |
-| Coarse location | Only if you set `proofUploadUrl` | App functionality (country-tier proofs) | No¹ | No |
+| Precise location | Only if you set `proofUploadUrl` (a proof at the default city level contains the exact coordinates), or in a gateway mode (country and state lookups send full-precision coordinates to `{gateway}/ext/geo/reverse`) | App functionality (location proofs) | No¹ | No |
+| Coarse location | Yes, as country and subdivision codes in the diagnostic signals, and in uploaded proofs if you set `proofUploadUrl` | App functionality (country-tier proofs), Analytics (region codes in the diagnostic signals) | No¹ | No |
 | Device ID (device fingerprint) | Yes — license activation + bound into proofs | App functionality / anti-fraud | No¹ | No |
-| Product interaction (usage counters) | Yes, unless `telemetryEnabled = false` | Analytics — aggregate counters, **no location** | No | No |
+| Product interaction (usage counters) | Yes, unless `telemetryEnabled = false` | Analytics: usage counters and per-proof events, no coordinates | No | No |
 | Product interaction (daily usage record) | Yes, always: one record per device per day | Billing (active-device count), **no location** | No | No |
 
 ¹ The device fingerprint is a pseudonymous per-install value, not an account identity;
@@ -156,7 +198,8 @@ the SDK itself does not link this data to a user identity. If **your** app assoc
 proofs with a user account, classify accordingly on your own form.
 
 No data is used for advertising or cross-app/site tracking. With `proofUploadUrl` unset
-(the default), no location leaves the device via the SDK at all.
+(the default) and the default direct transport mode, the SDK sends no coordinates to
+Octet. Country and state lookups then use the operating system's geocoder.
 
 ---
 
@@ -196,7 +239,6 @@ Choose the mode at `start()`:
 
 ```kotlin
 val config = OctetConfig(
-    licenseKey = "octet_live_v4.…",
     advanced = AdvancedConfig(
         transport = TransportPolicy(
             mode = TransportPolicy.Mode.INTEGRATOR_GATEWAY,
@@ -217,7 +259,6 @@ the app's only backend domain becomes that one Octet host:
 
 ```kotlin
 val config = OctetConfig(
-    licenseKey = "octet_live_v4.…",
     advanced = AdvancedConfig(transport = TransportPolicy.octetGateway))
 ```
 
@@ -232,9 +273,12 @@ run-your-own-proxy mode.
 
 | The SDK sends (under your gateway) | Forward it to | Notes |
 |---|---|---|
-| `/v1/activate`, `/v1/heartbeat`, `/v1/deactivate` | `https://api.octetproof.com/v1/…` | signed bodies — never modify |
+| `/v1/bootstrap/challenge`, `/v1/bootstrap`, `/v1/heartbeat` | `https://api.octetproof.com/v1/…` | activation. Never modify the body. |
 | `/v1/flags`, `/v1/metrics`, `/v1/credits/…` | `https://api.octetproof.com/v1/…` | flag bundles are signed — never modify |
 | `/v1/proofs`, `/v1/proofs/auth`, `/v1/proofs/challenge` | `https://api.octetproof.com/v1/…` | proof body up to 256 KiB — never modify |
+| `/v1/exposure` | `https://api.octetproof.com/v1/…` | **both SDKs**. Usage reporting. Sent only with `telemetryEnabled` on. Body not signed. |
+| `/v1/network/observe` | `https://api.octetproof.com/v1/…` | **both SDKs**. A `GET` with no body. |
+| `/v1/integrity/decode` | `https://api.octetproof.com/v1/…` | **both SDKs**. Sent only when your app calls `Octet.verifyOnline` with a Play Integrity decoder. Body not signed. |
 | `/ext/gnss/…` | `https://cddis.nasa.gov/archive/gnss/data/daily/…` (fallback `https://igs.ign.fr/pub/igs/data/…`) | **Android SDK only** — GNSS ephemeris (large files; may need NASA Earthdata credentials) |
 | `/ext/geo/…` | `https://api.octetproof.com/ext/geo/…` | **both SDKs**. **First-party & bearer-authed** — forward it like a `/v1/…` route (preserve `Authorization`, send `Host: api.octetproof.com`), not like the third-party `ext` routes above. |
 
@@ -245,13 +289,14 @@ Forward the third-party `/ext/gnss/` route only if you embed the Android SDK; `/
 - **Preserve the request verbatim** — method, the path after the prefix, the query
   string, and all headers, especially `Authorization`, `Content-Type`, and any
   `X-Octet-…` header.
-- **Never modify the body** of `/v1/proofs`, `/v1/flags`, or `/v1/activate`: each
-  signature is over the exact bytes, so any rewrite — even re-serialising the JSON
-  — breaks verification.
+- **Never modify the body** of `/v1/proofs`, `/v1/flags`, `/v1/bootstrap/challenge`
+  or `/v1/bootstrap`. Each signature is over the exact bytes, so any rewrite, even
+  re-serialising the JSON, breaks verification. Forward every other body, including
+  `/v1/heartbeat`, and the `Authorization` header unchanged as well.
 - **Use TLS 1.2 or higher to the upstream**, verify the upstream certificate, and
   send `Host: api.octetproof.com` (and matching SNI) on the first-party routes.
 - **Pass status codes and the `Retry-After` header through unchanged** — the SDK
-  honours `429`.
+  honours them on `429` and `503`.
 - **Don't cap the request body below 256 KiB**, and give the upstream at least as
   generous a timeout as you give the SDK (activation and attestation can be slow).
 
@@ -343,12 +388,13 @@ export default {
   if you'd rather the SDK keep working through a gateway *outage* than fail closed,
   set `fallbackToDirect = true`. After repeated transport-level failures to your
   gateway (connect / TLS / DNS / timeout — never HTTP status errors), the SDK
-  temporarily reverts the **critical calls** (activation, proof upload, credit) to
-  Octet directly, then re-probes your gateway and switches back once it recovers.
-  **This suspends the single-domain guarantee while active** — during the outage
-  those calls talk to `api.octetproof.com` directly — so a strict-compliance
-  deployment should leave it **off** (the default). Telemetry + flags always stay
-  gateway-only.
+  temporarily reverts only these calls to Octet directly: activation and heartbeat,
+  proof upload, credits, border-data updates, and the `/v1/integrity/decode` call.
+  It then re-probes your gateway and switches back once it recovers. Flags, metrics,
+  `/v1/exposure`, `/v1/network/observe`, `/ext/ipgeo/` and `/ext/gnss/` never fall
+  back. **This suspends the single-domain guarantee while active.** During the outage
+  the calls that fall back talk to `api.octetproof.com` directly, so a
+  strict-compliance deployment should leave it **off** (the default).
 
   ```kotlin
   transport = TransportPolicy(
@@ -373,8 +419,13 @@ export default {
       mode = TransportPolicy.Mode.OCTET_GATEWAY,
       osAttestationInGatewayModes = false)   // skip Play Integrity → un-attested proofs
   ```
-- **Forward `/ext/geo/…` too:** without it, country and state proofs return
-  `INDETERMINATE` unless `fallbackToDirect` is on.
+- **Forward `/ext/geo/…` too:** in a gateway mode the SDK resolves country and state
+  at `{gateway}/ext/geo/reverse`. If that call fails for any reason, including an HTTP
+  error such as `404` from a proxy that does not forward the route, state proofs
+  return `INDETERMINATE`. Country proofs may still resolve from the cell network.
+  With `fallbackToDirect` on, a failed `/ext/geo/reverse` call uses the operating
+  system's geocoder instead. This route is the only exception to the rule above: the
+  other routes that fall back react to transport errors only, never to an HTTP status.
 
 ---
 
@@ -418,15 +469,27 @@ actually achieved, and the acceptance decision lives at the verifier.
 
 ---
 
-## Reading a containment result's assurance tier
+## Confidence score and assurance tier
 
-`contains(...)` / `isWithin(.disc(...))` return a disc-shaped area proof, and
-that proof carries an **assurance tier** you should read before treating a `YES`
-as authoritative. Read it from `proof.spoofingVerdict` (or `spoofing_verdict` in
-`proof` JSON):
+By default, the SDK reports **no confidence score and no assurance tier**:
 
-| Tier | What a `YES` means |
-|---|---|
+- `confidence` on a verdict or proof holds neutral values (`overallScore` and
+  `spoofingRiskScore` are `0`, `sensorContributions` and `flags` are empty), and
+  `toStr()` prints no `conf=`.
+- `proof.spoofingVerdict` is `UNSPECIFIED` (`"UNSPECIFIED"` in JSON).
+- `Octet.verify` reports no tier: `ProofVerification.spoofingVerdict` is empty and a
+  `requireVerdict` option is ignored (its check reports "not checked").
+
+These fields are deprecated and will be removed in the next major release. The answer
+itself (`result`, `level`, `reason`, `achievableLevel`) is unchanged. If you need more
+device intelligence or your own scoring logic, Octet offers it as a custom feature or
+license.
+
+Disc queries are unaffected: with `OctetConfig.advanced.acceptPlausibleContainment = true` a disc query can return a lower-assurance
+`YES`; with it off (the default) it returns `INDETERMINATE` instead. Tight tolerances
+only pass with a tight location fix.
+
+---|---|
 | `VERIFIED` | Corroborated: independent evidence supports the fix. |
 | `PLAUSIBLE` | Lower assurance: the fix is consistent with your query but is **not** independently corroborated. |
 
@@ -439,10 +502,14 @@ not treat the region granularity alone as assurance.
 
 ## Device attestation
 
-Every signed proof carries a hardware-backed **device attestation** via Google
-Play Integrity, so a relying party can confirm the proof came from a genuine app
-instance on a genuine device. No integration code is required; it is part of
-proof generation. How often a fresh attestation is produced is configurable via
+When Google Play Integrity is available, the SDK requests a Play Integrity token and
+binds it into the proof through its nonce, which is part of the data the device key
+signs. The token is opaque on the device, so the proof records its status as
+`INTEGRITY_PENDING`, or `INTEGRITY_UNAVAILABLE` when no token could be obtained. With
+`osAttestationInGatewayModes = false` in a gateway mode, the SDK requests no token and
+the proof carries no Play Integrity status at all. A relying party's verifier decodes the token and decides what it means. A
+missing or non-compliant Play Integrity result does not stop the SDK from producing
+the proof. No integration code is required. It is part of proof generation. How often a fresh attestation is produced is configurable via
 `OctetConfig.advanced.attestationCadence` — `PerSession`, `Periodic(intervalSeconds)`
 (default), or `PerProof` (highest assurance, highest cost).
 
@@ -503,12 +570,111 @@ ignores the binding (NOT-CHECKED). `sessionNonce` must be **1…512 bytes** — 
 larger returns an `invalidSessionNonce` verdict with no proof and no network call.
 Omit it entirely for normal, cacheable proofs (behaviour is unchanged from 1.1.0).
 
+To check the binding on the device instead, pass the same nonce to `Octet.verify` with
+`VerifyOptions(expectedSessionNonce = loginNonce)`. The `session-binding` check then fails a proof made
+for a different nonce, or for none. Your backend still has to make sure each nonce is
+used only once.
+
+---
+
+## Content commitments (new in 3.1.0)
+
+Pass `content` to `isWithin`, `isOutside` or `contains`, and the device signs a commitment to
+that content into the proof: each item's key, content type, size and `SHA256(salt ‖ value)`.
+The content and the salts stay on the device unless you upload them (see below). A verifier who receives the content can confirm
+that this attested device asserted exactly that content at the proof's time and place. The
+commitment does not prove that the content is authentic or unedited.
+
+```kotlin
+val video = Octet.hashContent(videoFile)                   // any size, before the call
+val verdict = sdk.loc.isWithin(OctetRegion.country("GB"), content = listOf(
+    ContentItem.bytes("note", "text/plain", "valve 7 OK".toByteArray()),
+    ContentItem.digest("video", "video/mp4", video),
+))
+```
+
+- `ContentItem.file(...)` items are hashed in the call up to 64 MiB. Hash larger files with
+  `Octet.hashContent` first and pass a `digest` item.
+- The SDK salts each item with a random 32-byte salt unless you pass your own. Read it back from
+  the item's `salt` (or `ContentDigest.salt`) and keep it with the content. The verifier needs it.
+- The SDK hashes exactly the bytes you pass. Strip metadata such as EXIF before you create the
+  item, if you want it stripped.
+- Content that breaks a rule returns an `INVALID_CALLER_CONTENT` verdict with no proof. Without
+  location authorization, a query with content returns `PERMISSION_REQUIRED`.
+- To check a commitment on the device, pass the manifest and content in
+  `VerifyOptions.callerMetadata`, and accept the proof only when `verdict == ProofVerification.Verdict.VALID`.
+- The manifest is the JSON `{"v":1,"entries":[{"key","contentType","size","salt","sha256"}]}`,
+  one entry per item in the order of the proof's `contentCommitments`, with `salt` and `sha256`
+  in lower-case hex. Build it from `contentCommitments` and the salts you kept. To check content
+  on your backend, use `octet-verify` 1.8.0 or later.
+- Caller content is off until Octet enables it for your licence. Until then, a query with
+  `content` returns `INDETERMINATE` with reason `CALLER_CONTENT_NOT_ENABLED` and no proof.
+  Queries without content are unaffected.
+
+### Uploading content to your storage
+
+The SDK can upload the exact bytes it committed to storage you control, for example through a
+pre-signed S3, GCS or Azure URL that your backend creates. Octet stores none of the bytes. The
+upload starts after the proof is made and never changes it. The proof stays valid whether or
+not the upload arrives.
+
+```kotlin
+// In Application.onCreate:
+Octet.setContentUploadProvider(object : ContentUploadProvider {
+    override suspend fun uploadTarget(request: ContentUploadRequest): ContentUploadTarget {
+        // Ask your backend for a fresh pre-signed URL for this item.
+        val url = myBackend.presignedPut(request.proofId, request.key)
+        return ContentUploadTarget(url)
+    }
+})
+Octet.setContentUploadListener { status ->
+    Log.d("Uploads", "${status.proofId} ${status.key} ${status.state}")
+}
+
+val verdict = sdk.loc.isWithin(OctetRegion.country("GB"), content = listOf(
+    ContentItem.file("photo", "image/jpeg", photoFile, upload = true, locator = "site-7/photo.jpg"),
+))
+```
+
+- Set `upload = true` on a `bytes` or `file` item, or pass `uploadFrom` (the file you hashed)
+  on a `digest` item. Items without it are committed only.
+- `locator` is an optional label you choose for where the content is kept. The proof lists it
+  but doesn't sign it, and your provider receives it. Keep it to 256 bytes. Never put a
+  credential, or a URL with a query string, in it.
+- The SDK asks your provider for a target before every attempt, so return a freshly signed URL
+  each time. `ContentUploadRequest` carries the proof id, key, content type, size, committed
+  digest, locator and salt. Store the salt with the file, for example as object metadata. A
+  verifier needs it.
+- For large files, return `ContentUploadTarget.gcsResumable(sessionUrl)`,
+  `ContentUploadTarget.azureBlock(sasUrl)` or `ContentUploadTarget.s3Multipart(uploadId)`. The
+  SDK sends the file in chunks and continues after an interruption. For S3 multipart, also
+  implement `s3PartTarget` and `s3Complete` in your provider.
+- Before each attempt the SDK hashes the content again. If the file changed or is gone, it
+  uploads nothing and the item fails with `ContentChanged` or `ContentMissing`. Keep the file
+  unchanged until its upload finishes.
+- The listener reports each item's state, `Pending`, `Uploading`, `Uploaded` or
+  `Failed(failure)`, off the main thread. `Octet.contentUploads(proofId)` returns the same
+  states for one proof, and is empty before `Octet.start`. Finished uploads stay listed for
+  7 days.
+- Network errors, `408`, `429` and `5xx` responses, and errors your provider throws are
+  retried with backoff, up to 8 attempts within 24 hours. Any other `4xx` fails the item with
+  `Rejected(httpStatus)`. When retries run out, the item fails with `ProviderFailed` if your
+  provider kept failing, and with `Exhausted` otherwise. An item not uploaded within 7 days
+  also fails with `Exhausted`. Delivery isn't guaranteed, so check the state before you rely on
+  the file being in your storage.
+- Uploads run in a job the SDK schedules with Android whenever a network is available. They
+  continue while your app is closed and after its process is killed. Register the provider in
+  `Application.onCreate`, so it is in place when Android runs the job with your app in the
+  background. Without a provider, queued uploads wait, for up to 7 days.
+- Uploads go straight to the URL your provider returns. A gateway set in `TransportPolicy` and
+  its certificate pins don't apply to them, so allow your storage host if you restrict egress.
+
 ---
 
 ## Keeping your verifier current
 
 If your backend verifies proofs itself with `octet-verify`, upgrade it to
-**octet-verify ≥ 1.5.0** before you adopt a future OctetSDK release that switches
+**octet-verify ≥ 1.5.0** before you adopt OctetSDK 3.1.0, which switches
 proofs to **semantic-binding v3**. v3 also signs the region a proof was asked about,
 so your verifier can read the device's signed inside/outside answer for that region.
 A verifier older than 1.5.0 reports the `semantic-binding` check as FAIL for every v3
@@ -516,13 +682,11 @@ proof.
 
 1.5.0 is available now and verifies earlier proofs too (v3, then v2, then v1), so
 upgrading ahead of time is safe. The SDK's own `Octet.verify` already handles v3.
-Release notes will say which OctetSDK release turns v3 on.
 
-**Gate on the signed verdict, not on `isValid` alone.** A disc answer (`contains()` or
-`isWithin(.disc(...))`) can be signed `VERIFIED` or `PLAUSIBLE`, and both verify. On your
-backend, octet-verify ≥ 1.6.0 enforces a tier with `--require-verdict verified` (or
-`plausible`). On the device, `Octet.verify` does the same with
-`VerifyOptions(requireVerdict = RequiredVerdict.VERIFIED)`, and reports the signed tier as `ProofVerification.spoofingVerdict`.
+**The signed tier on your backend.** The tier is still signed inside the proof bytes, and octet-verify
+≥ 1.6.0 can enforce it with `--require-verdict verified` (or `plausible`). On the device,
+`Octet.verify` reports and enforces it only where the tier is enabled for your licence (see
+"Confidence score and assurance tier").
 
 ---
 
@@ -544,19 +708,25 @@ before re-requesting.
 
 ---
 
-## Custom log routing
+## Log output
 
-The SDK emits structured log lines through a pluggable `LogSink`
-interface. The platform default is `AndroidLogSink`, which forwards
-into `android.util.Log`.
+A released SDK writes only lines you can act on to logcat. They go through
+`AndroidLogSink`, which forwards into `android.util.Log`:
 
-Implement `LogSink` and pass it via `OctetConfig.logSink` to route the
-SDK's log lines into your own observability pipeline. Release builds
-gate logcat emission behind `BuildConfig.DEBUG`
-so coordinates and license fragments do not appear in plain text in
-a released build's logcat output; a released SDK does not write to the host
-app's logcat at all — the internal diagnostic stream is emitted only by a
-debug build of the SDK.
+| Tag | Level | When |
+|---|---|---|
+| `OctetLicense` | INFO | Every `Octet.start`: which license mode it took: `sandbox` when `sandboxBypassToken` is set, `attested` otherwise. An attested app lands on release when release signed, on sandbox when debug signed. |
+| `OctetLicense` | WARN | The SDK version is deprecated, or the license stops working within 30 days. |
+| `OctetLicense` | ERROR | `Octet.start` threw a `LicenseError`. Names the case and what to fix. |
+| `OctetPlayIntegrity` | WARN | A Play Integrity setup problem you can fix: an invalid cloud project number, a used-up request quota, or the API not enabled. Once per process. |
+| `SandboxBootstrap` | WARN | A debuggable build carries a `sandboxBypassToken`, which a release build will refuse. |
+
+Set `OctetConfig.advanced.logLevel` to `LogLevel.WARN` or `LogLevel.ERROR` to
+quiet the lower lines. None of these lines carry coordinates, device
+identifiers or your sandbox token.
+
+The SDK's internal diagnostic stream is gated behind `BuildConfig.DEBUG`, so
+only a debug build of the SDK writes it to logcat. A released SDK never does.
 
 ---
 

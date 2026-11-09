@@ -60,12 +60,13 @@ data class DebugLine(val id: Long, val timeMs: Long, val text: String)
 data class GenerateResult(
     val result: OctetVerdict.Result,
     val regionLabel: String,
-    val bucket: ConfidenceBucket,
-    val score: Double,
+    val score: Double?,              // null when the licence hides the score
     val fresh: Boolean,
     val stored: StoredProof?,
     val battery: BatteryCost? = null,
-)
+) {
+    val bucket: ConfidenceBucket? get() = ConfidenceBucket.of(score)
+}
 
 /** Battery consumed across one proof run, measured from the hardware charge
  *  counter. `mAh`/`avgMa` are null when the device was charging or the run was
@@ -121,7 +122,8 @@ class SampleViewModel(app: Application) : AndroidViewModel(app) {
     /** A `.octetproof` awaiting the import-preview dialog. */
     var pendingImport by mutableStateOf<ProofEnvelope?>(null)
 
-    private var sdk: OctetSdk? = null
+    var sdk: OctetSdk? = null
+        private set
     private var started = false
     private var didAutoSelectCountry = false
     private var userOverrodeCountry = false
@@ -131,8 +133,15 @@ class SampleViewModel(app: Application) : AndroidViewModel(app) {
 
     // MARK: - lifecycle
 
-    /** Called by the Activity once ACCESS_FINE_LOCATION is granted. */
-    fun onPermissionGranted() {
+    /** Set when the user granted approximate location only. */
+    var locationNotice by mutableStateOf<String?>(null)
+        private set
+
+    /** Called by the Activity once location is granted, precise or approximate only. */
+    fun onPermissionGranted(precise: Boolean = true) {
+        locationNotice = if (precise) null else
+            "Approximate location only: country proofs work, city or finer proofs may be unavailable. " +
+                "Allow precise location for those."
         if (started) return
         started = true
         sdkState = SdkState.Starting
@@ -159,9 +168,9 @@ class SampleViewModel(app: Application) : AndroidViewModel(app) {
                 log("activation ✓")
                 s.licenseStatus?.let { st ->
                     licenseLine = "license ${st.state}"
-                    if (st.state == LicenseState.GRACE_PERIOD && st.daysUntilHardStop != null) {
+                    if (st.state == LicenseState.RENEWAL_RECOMMENDED && st.daysUntilHardStop != null) {
                         val d = st.daysUntilHardStop
-                        licenseNotice = "Your license expires in $d day${if (d == 1) "" else "s"} — please renew."
+                        licenseNotice = "The Octet license ends in $d day${if (d == 1) "" else "s"}. Licenses renew automatically. If it has not renewed, contact Octet."
                     }
                 }
             } catch (e: Exception) {
@@ -227,12 +236,13 @@ class SampleViewModel(app: Application) : AndroidViewModel(app) {
             // forceFresh always mints a new proof, so a produced proof is fresh;
             // otherwise trust the SDK's honest "freshly generated" message.
             val fresh = forceFresh || verdict.message.contains("fresh", ignoreCase = true)
-            log("fix quality: ${bucketLabel(verdict.confidence.overallScore)}")
+            val score = reportedScore(verdict)
+            ConfidenceBucket.of(score)?.let { log("fix quality: ${bucketLabel(it)}") }
 
             var stored: StoredProof? = null
             val proof = verdict.proof
             if (proof != null) {
-                val sp = makeStoredProof(proof, verdict.result)
+                val sp = makeStoredProof(proof, verdict.result, score)
                 val isNew = store.add(sp)
                 stored = sp
                 log(if (isNew) "proof built (${proof.proofBytes.size} B) · stored" else "proof already stored")
@@ -244,8 +254,7 @@ class SampleViewModel(app: Application) : AndroidViewModel(app) {
             lastResult = GenerateResult(
                 result = verdict.result,
                 regionLabel = selectedCountry.name,
-                bucket = ConfidenceBucket.of(verdict.confidence.overallScore),
-                score = verdict.confidence.overallScore,
+                score = score,
                 fresh = fresh,
                 stored = stored,
                 battery = battery,
@@ -255,7 +264,21 @@ class SampleViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun makeStoredProof(proof: LocationProof, result: OctetVerdict.Result) = StoredProof(
+    /**
+     * A licence that doesn't expose the score gets a ConfidenceSummary of
+     * neutral values only (0, empty). That means "not reported", not "weak", so the sample
+     * shows no score or bucket rather than a red LOW 0.00. Read from the summary, not
+     * `LocationProof.spoofingVerdict`: the public flavour pins a published SDK that predates
+     * that field. LOCKSTEP with iOS `reportedScore`.
+     */
+    private fun reportedScore(verdict: OctetVerdict): Double? {
+        val c = verdict.confidence
+        val hidden = c.overallScore == 0.0 && c.spoofingRiskScore == 0.0 &&
+            c.sensorContributions.isEmpty() && c.flags.isEmpty()
+        return if (hidden) null else c.overallScore
+    }
+
+    private fun makeStoredProof(proof: LocationProof, result: OctetVerdict.Result, score: Double?) = StoredProof(
         id = UUID.randomUUID().toString(),
         proofB64 = Base64.encodeToString(proof.proofBytes, Base64.NO_WRAP),
         regionISO = selectedCountry.iso,
@@ -263,7 +286,7 @@ class SampleViewModel(app: Application) : AndroidViewModel(app) {
         level = levelLabel(proof.level),
         generatedAtMs = proof.timestampMs,
         createdAtMs = System.currentTimeMillis(),
-        confidenceScore = proof.confidence.overallScore,
+        confidenceScore = score,
         predicateResult = resultLabel(result),
         imported = false,
         sizeBytes = proof.proofBytes.size,
@@ -296,7 +319,7 @@ class SampleViewModel(app: Application) : AndroidViewModel(app) {
             level = "—",
             generatedAtMs = env.generatedAtMs,
             createdAtMs = System.currentTimeMillis(),
-            confidenceScore = 0.0,
+            confidenceScore = null,
             predicateResult = null,
             imported = true,
             sizeBytes = bytes.size,
@@ -405,7 +428,7 @@ class SampleViewModel(app: Application) : AndroidViewModel(app) {
 
     // MARK: - labels (public, non-sensitive)
 
-    fun bucketLabel(score: Double) = when (ConfidenceBucket.of(score)) {
+    fun bucketLabel(bucket: ConfidenceBucket) = when (bucket) {
         ConfidenceBucket.HIGH -> "strong"
         ConfidenceBucket.MEDIUM -> "ok"
         ConfidenceBucket.LOW -> "weak"

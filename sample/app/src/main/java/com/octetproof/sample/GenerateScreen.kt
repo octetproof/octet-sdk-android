@@ -64,8 +64,9 @@ fun GenerateScreen(vm: SampleViewModel, nav: NavController) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item { Header(vm, nav) }
+        channelGenerateBanner(vm)
         item { PipelineCard(vm) }
-        vm.licenseNotice?.let { notice ->
+        listOfNotNull(vm.locationNotice, vm.licenseNotice).forEach { notice ->
             item {
                 Text(
                     notice,
@@ -201,8 +202,11 @@ private fun ResultCard(result: GenerateResult, nav: NavController) {
         }
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Chip(result.bucket.label, result.bucket.tint.color())
-            Text("%.2f".format(result.score), fontFamily = FontFamily.Monospace, color = Color.Gray)
+            val bucket = result.bucket
+            if (bucket != null && result.score != null) {
+                Chip(bucket.label, bucket.tint.color())
+                Text("%.2f".format(result.score), fontFamily = FontFamily.Monospace, color = Color.Gray)
+            }
             if (result.stored != null) {
                 if (result.fresh) Chip("✓ fresh", Theme.pass) else Chip("cached")
             }

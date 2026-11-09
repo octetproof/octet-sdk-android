@@ -19,6 +19,9 @@ fun NavGraphBuilder.channelRoutes(vm: SampleViewModel, nav: NavController) {}
 fun RowScope.ChannelTabs(vm: SampleViewModel, route: String?, nav: NavController) {}
 
 @Suppress("UnusedReceiverParameter", "UNUSED_PARAMETER")
+fun LazyListScope.channelGenerateBanner(vm: SampleViewModel) {}
+
+@Suppress("UnusedReceiverParameter", "UNUSED_PARAMETER")
 fun LazyListScope.channelGenerateExtras(vm: SampleViewModel) {}
 
 @Suppress("UNUSED_PARAMETER")

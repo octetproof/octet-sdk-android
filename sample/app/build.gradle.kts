@@ -93,6 +93,13 @@ android {
     }
 }
 
+// appcompat 1.8 (direct and through material/libpf) pulls org.jspecify:jspecify, whose
+// META-INF/versions/9/OSGI-INF/MANIFEST.MF clashes with the SDK's BouncyCastle in the APK.
+// Nullness annotations only (CLASS retention), so drop it from every configuration.
+configurations.all {
+    exclude(group = "org.jspecify", module = "jspecify")
+}
+
 dependencies {
     implementation("com.octetproof:sdk:$octetSdkVersion")
 
@@ -109,7 +116,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     // AppCompat supplies the activity's DayNight NoActionBar theme; Compose renders inside it.
-    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("androidx.appcompat:appcompat:1.8.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")

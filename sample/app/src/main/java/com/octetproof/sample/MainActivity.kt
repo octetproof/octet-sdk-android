@@ -28,16 +28,18 @@ class MainActivity : ComponentActivity(), LocationListener {
 
     private val vm: SampleViewModel by viewModels()
 
+    // Ask for precise and approximate together (the Android 12+ pattern). The user may
+    // grant approximate only; the SDK still runs then (country-level proofs work, finer levels
+    // report insufficientPrecision), so either grant starts it.
     private val requestPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) onLocationGranted() }
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { result -> if (result.values.any { it }) onLocationGranted() }
 
-    // Best-effort: the step counter feeds the SDK's sensor-location coherence
-    // anti-spoof signal, which needs ACTIVITY_RECOGNITION on API 29+. Not required
-    // for the SDK to run (it skips the check when steps are unavailable — see #239).
+    // Best-effort: step counter access needs ACTIVITY_RECOGNITION on API 29+.
+    // Not required for the SDK to run.
     private val requestActivityRecognition = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { /* result ignored — coherence just stays skipped if denied */ }
+    ) { /* result ignored: the SDK runs either way */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,17 +57,19 @@ class MainActivity : ComponentActivity(), LocationListener {
                 }
             }
         }
-        val granted = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_FINE_LOCATION,
-        ) == PackageManager.PERMISSION_GRANTED
-        if (granted) onLocationGranted()
-        else requestPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) ||
+            hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)) onLocationGranted()
+        else requestPermission.launch(arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
     }
+
+    private fun hasPermission(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
     private fun onLocationGranted() {
         startLocationUpdates()
         maybeRequestActivityRecognition()
-        vm.onPermissionGranted()
+        vm.onPermissionGranted(precise = hasPermission(Manifest.permission.ACCESS_FINE_LOCATION))
     }
 
     private fun maybeRequestActivityRecognition() {
@@ -79,8 +83,10 @@ class MainActivity : ComponentActivity(), LocationListener {
     @SuppressLint("MissingPermission")
     private fun startLocationUpdates() {
         val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        // The GPS provider needs precise location; with approximate only, use the network one.
+        val precise = hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)
         val provider = when {
-            lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+            precise && lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
             lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
             else -> return
         }
