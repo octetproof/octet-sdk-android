@@ -1,0 +1,97 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.octetproof",
+    "module": "libpf",
+    "version": "3.1.0",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.11.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseVariantReleaseApiPublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.1.21"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "libpf-3.1.0.aar",
+          "url": "libpf-3.1.0.aar",
+          "size": 7052006,
+          "sha512": "fe221fe67d4272dccaf9d2c3f0029aec12cce30d114ea7bdf73878f207dd89fbbcf27793f399b20af69c53c0f404834b24daaa7bf348cd66b3a19cf25a06f1f8",
+          "sha256": "e16ffb0b8207ce7980c4f8b007438d3eba82bcf91ca40af16ac0ce4fdd3b3f61",
+          "sha1": "8e87d5a743e1a06107e3eaa65701de9e8ce3f111",
+          "md5": "908e1362d355a02467d1dc72b2ebed42"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseRuntimePublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.core",
+          "module": "core-ktx",
+          "version": {
+            "requires": "1.9.0"
+          }
+        },
+        {
+          "group": "androidx.appcompat",
+          "module": "appcompat",
+          "version": {
+            "requires": "1.6.1"
+          }
+        },
+        {
+          "group": "com.google.android.material",
+          "module": "material",
+          "version": {
+            "requires": "1.8.0"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.1.21"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "libpf-3.1.0.aar",
+          "url": "libpf-3.1.0.aar",
+          "size": 7052006,
+          "sha512": "fe221fe67d4272dccaf9d2c3f0029aec12cce30d114ea7bdf73878f207dd89fbbcf27793f399b20af69c53c0f404834b24daaa7bf348cd66b3a19cf25a06f1f8",
+          "sha256": "e16ffb0b8207ce7980c4f8b007438d3eba82bcf91ca40af16ac0ce4fdd3b3f61",
+          "sha1": "8e87d5a743e1a06107e3eaa65701de9e8ce3f111",
+          "md5": "908e1362d355a02467d1dc72b2ebed42"
+        }
+      ]
+    }
+  ]
+}
