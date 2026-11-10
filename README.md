@@ -28,7 +28,7 @@ In your app `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.octetproof:sdk:3.1.1")
+    implementation("com.octetproof:sdk:3.1.2")
 }
 ```
 
