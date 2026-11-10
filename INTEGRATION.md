@@ -706,6 +706,13 @@ When `result` is `INDETERMINATE` with reason `INSUFFICIENT_PRECISION`, read
 `verdict.achievableLevel` to decide whether the coarser level is acceptable
 before re-requesting.
 
+Near a border between two subdivisions, a device whose accuracy area crosses that border
+can only be proven at the country level. A subdivision query returns `INDETERMINATE` with
+`INSUFFICIENT_PRECISION` and `achievableLevel` `COUNTRY`, and a proof of the device's own area
+claims the country only. A policy that accepts only one of the two subdivisions will see
+such a device as unknown, not as inside or outside. Plan for that answer near
+subdivision borders, for example by asking again once the device has a better fix.
+
 ---
 
 ## Log output

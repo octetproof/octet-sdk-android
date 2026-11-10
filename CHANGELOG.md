@@ -5,6 +5,11 @@ All notable changes to the OctetSDK for Android are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.1.1] — 2026-11-10
+
+> Patch release, in lockstep with iOS 3.1.1. No changes on Android: this version exists so both
+> platforms share one version number.
+
 ## [3.1.0] — 2026-11-09
 
 > Minor release, in lockstep with iOS 3.1.0.

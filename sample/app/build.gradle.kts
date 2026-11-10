@@ -42,7 +42,7 @@ val octetPiCloudProject: String =
 // estimated positions, shown with a badge.
 val octetOpenCellIdKey: String = localProps.getProperty("octet.openCellIdKey", "")
 
-val octetSdkVersion: String = (project.findProperty("octetSdkVersion") as String?) ?: "2.0.0"
+val octetSdkVersion: String = (project.findProperty("octetSdkVersion") as String?) ?: "3.1.0"
 
 android {
     namespace = "com.octetproof.sample"

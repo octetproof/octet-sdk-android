@@ -154,6 +154,7 @@ fun VerifyDetailScreen(vm: SampleViewModel, proof: StoredProof, nav: NavControll
             item { VerdictHeader(v) }
             checkGroup("PASSED", v.checks.filter { it.status == CheckStatus.PASS }, StatusKind.OK)
             checkGroup("WARN", v.checks.filter { it.status == CheckStatus.WARN }, StatusKind.WARN)
+            checkGroup("INCONCLUSIVE", v.checks.filter { it.status == CheckStatus.INCONCLUSIVE }, StatusKind.WARN)
             checkGroup("NOT-CHECKED", v.checks.filter { it.status == CheckStatus.NOT_CHECKED }, StatusKind.NOT_CHECKED)
             checkGroup("FAILED", v.checks.filter { it.status == CheckStatus.FAIL }, StatusKind.BAD)
             item {
